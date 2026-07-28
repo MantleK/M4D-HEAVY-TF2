@@ -662,6 +662,31 @@
   .forum ul { margin: 0; padding-left: 1.1rem; font-size: 0.9375em; color: var(--pdim); }
   .forum li { margin-bottom: 0.3rem; }
 
+  .forum__actions { display: flex; flex-wrap: wrap; gap: 0.6rem; margin-top: 0.25rem; }
+  .btn {
+    display: inline-block;
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.125rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-decoration: none;
+    background: var(--accent);
+    color: var(--accent-d);
+    border: 1px solid var(--accent);
+    padding: 0.55rem 1.1rem;
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+    transition: transform 0.09s ease, box-shadow 0.09s ease;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.4); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); }
+  .btn:focus-visible { outline: 3px solid var(--m4d); outline-offset: 3px; }
+  .btn--quiet { background: transparent; color: var(--ptext); border-color: var(--edge); box-shadow: none; }
+  .btn--quiet:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); box-shadow: none; }
+  .forum__foot { font-size: 0.8125rem; color: var(--pdim); margin-top: 0.25rem; }
+  .forum__foot a { color: var(--accent); }
+  @media (prefers-reduced-motion: reduce) { .btn, .btn:hover, .btn:active { transition: none; transform: none; } }
+
   /* ================= troubleshooting ================= */
   .faq { margin: 0; display: flex; flex-direction: column; gap: 1rem; }
   .faq dt { font-weight: 700; color: var(--accent-ink); }
@@ -724,7 +749,10 @@
       drone. Runs alongside your normal TF2 &mdash; it changes nothing about your real install.
     </p>
     <div class="getit">
-      <a class="dl" href="M4DHeavyTF2.zip" id="download" download>
+      <!-- ABSOLUTE url on purpose. A relative "M4DHeavyTF2.zip" only resolves when the page is
+           served from the same folder as the file, so it 404s on the claude.ai artifact preview.
+           An absolute link works from every host: the artifact, GitHub Pages, and heavy.tf later. -->
+      <a class="dl" href="https://raw.githubusercontent.com/MantleK/M4D-HEAVY-TF2/main/M4DHeavyTF2.zip" id="download" download>
         <b>Download</b>
         <span>13 MB &middot; .zip &middot; Windows 64-bit</span>
       </a>
@@ -1439,20 +1467,26 @@
   </section>
 
   <section id="forum">
-    <h2>The forum</h2>
+    <h2>The Discord</h2>
+    <p class="lede">
+      Bugs, balance arguments, and finding someone to actually play against &mdash; it all happens
+      in one place.
+    </p>
     <div class="forum">
-      <h3>Not open yet</h3>
+      <h3>Come and shout about it</h3>
       <p>
-        There&rsquo;s no forum behind this link so far &mdash; no threads, no votes, no accounts.
-        Rather than fake a busy comment section, here&rsquo;s the honest version: the argument is
-        happening wherever you already are.
+        Tell us what&rsquo;s broken, argue with the changes, or post in the roadmap threads while
+        those weapons are still cheap to redesign. If you need someone to play with, ask there
+        &mdash; there are no public servers, so a partner is half the setup.
       </p>
-      <ul>
-        <li>Tell us which of the changes above miss, and why.</li>
-        <li>Pick fights with the roadmap &mdash; most of it isn&rsquo;t built, so it&rsquo;s still cheap to change.</li>
-        <li>Report anything that breaks. Every weapon on this page needs a real playtest.</li>
-      </ul>
-      <p>When there&rsquo;s somewhere to point you, this is where the link goes.</p>
+      <div class="forum__actions">
+        <a class="btn" href="https://discord.gg/3ZBDm5Avc" target="_blank" rel="noopener">Join the Discord</a>
+      </div>
+      <p class="forum__foot">
+        Crashed? Run the game once with <code class="inline">-condebug</code> and post
+        <code class="inline">console.log</code> from your install folder &mdash; it usually names
+        the cause outright.
+      </p>
     </div>
   </section>
 
