@@ -1,0 +1,1783 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>M4D Heavy TF2</title>
+<meta name="description" content="A Team Fortress 2 overhaul mod. Marked For Death, stacking afterburn, a Pyro who heals, and an Engineer with a pet drone.">
+<meta property="og:title" content="M4D Heavy TF2">
+<meta property="og:description" content="A Team Fortress 2 overhaul mod. Download, install steps, and how to play together.">
+<meta property="og:type" content="website">
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  img, svg, video { max-width: 100%; height: auto; }
+</style>
+
+</head>
+<body>
+<style>
+  /* Panels are ALWAYS the night colours. Only the ground under them changes
+     between day and night, so the beige never touches a panel. */
+  :root {
+    --panel:    #2B2521;
+    --panel-2:  #342D27;
+    --edge:     #4A4038;
+    --edge-hi:  #5C5046;
+    --code-bg:  #1A1613;
+    --ptext:    #E8DECD;
+    --pdim:     #9E9184;
+    --accent:   #E09A3E;
+    --accent-d: #1F1B18;
+    --m4d:      #E05A50;
+    --pos:      #78A8CE;
+    --neg:      #CE5B57;
+    --beige:    #E2D7BF;	/* the light-theme ground, needed as a fixed value by the day button */
+
+    /* ground layer - the only theme-varying tokens */
+    --ground:     #1F1B18;
+    --band:       #16120F;
+    --ink:        #E8DECD;
+    --ink-dim:    #9E9184;
+    --ink-rule:   #4A4038;
+    --accent-ink: #E09A3E;
+    --drop:       rgba(0, 0, 0, 0.4);
+    --sbar:       #000000;
+
+    --display: "Haettenschweiler", "Arial Narrow Bold", "Franklin Gothic Heavy", Impact, sans-serif;
+    --body: Verdana, "DejaVu Sans", Geneva, sans-serif;
+    --mono: Consolas, "Roboto Mono", "DejaVu Sans Mono", monospace;
+
+    --step: clamp(1rem, 0.85rem + 0.6vw, 1.0625rem);
+    --measure: 66ch;
+    --gutter: max(1rem, calc(50vw - 30rem));
+    --colw: 15rem;
+
+    color-scheme: light dark;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --ground:     #E2D7BF;
+      --band:       #D3C6A8;
+      --ink:        #2C2620;
+      --ink-dim:    #6B6053;
+      --ink-rule:   #B5A588;
+      --accent-ink: #8A5316;
+      --drop:       rgba(44, 38, 32, 0.3);
+      --sbar:       #FFFFFF;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:     #E2D7BF;
+    --band:       #D3C6A8;
+    --ink:        #2C2620;
+    --ink-dim:    #6B6053;
+    --ink-rule:   #B5A588;
+    --accent-ink: #8A5316;
+    --drop:       rgba(44, 38, 32, 0.3);
+    --sbar:       #FFFFFF;
+  }
+  :root[data-theme="dark"] {
+    --ground:     #1F1B18;
+    --band:       #16120F;
+    --ink:        #E8DECD;
+    --ink-dim:    #9E9184;
+    --ink-rule:   #4A4038;
+    --accent-ink: #E09A3E;
+    --drop:       rgba(0, 0, 0, 0.4);
+    --sbar:       #000000;
+  }
+
+  /* RED/BLU swap - flips every red and blue in the page: the +/- attribute lines,
+     the host/join panels, the M4D wordmark and the "Required" tags. */
+  :root[data-teams="swapped"] {
+    --pos: #CE5B57;
+    --neg: #78A8CE;
+    --m4d: #78A8CE;
+  }
+
+  /* The page's own vertical scrollbar: a thin square bar and nothing else - no
+     track, no groove, no end arrows.
+     Chrome/Edge/Safari get it purely through ::-webkit-scrollbar, which is the
+     only route that can delete the track and the arrow buttons outright. */
+  html::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+  html::-webkit-scrollbar-track,
+  html::-webkit-scrollbar-track-piece { background: transparent; box-shadow: none; border: 0; }
+  html::-webkit-scrollbar-thumb { background: var(--sbar); border: 0; border-radius: 0; }
+  html::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+  html::-webkit-scrollbar-corner { background: transparent; }
+
+  /* Firefox has no scrollbar pseudo-elements, so the standard properties are the
+     only lever there. They are fenced off from Chrome deliberately: setting
+     scrollbar-width/scrollbar-color in Chrome switches that scroller to the
+     standard model and makes it IGNORE every ::-webkit-scrollbar rule above -
+     which is exactly what was putting the grey track and the up/down arrows back. */
+  @supports not selector(::-webkit-scrollbar) {
+    html {
+      scrollbar-width: thin;
+      scrollbar-color: var(--sbar) transparent;
+    }
+  }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: var(--step);
+    line-height: 1.65;
+    -webkit-text-size-adjust: 100%;
+    overflow-x: clip;
+  }
+
+  .wrap {
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: clamp(1rem, 3vw, 2.5rem) clamp(1rem, 4vw, 2rem) 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2.5rem, 6vw, 4.5rem);
+  }
+
+  /* ================= left rail ================= */
+  .rail {
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    width: 6.5rem;
+    z-index: 60;
+    display: flex;
+    align-items: stretch;
+    pointer-events: none;
+  }
+  .rail__hot { position: absolute; inset: 0; pointer-events: auto; }
+
+  .rail__panel {
+    position: relative;
+    width: 5rem;
+    height: 100vh;
+    background: var(--panel);
+    color: var(--ptext);
+    border-right: 1px solid var(--edge);
+    box-shadow: 4px 0 18px var(--drop);
+    padding: 1.1rem 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+    opacity: 0;
+    transform: translateX(-100%);
+    transition: opacity 0.22s ease, transform 0.22s ease;
+    pointer-events: none;
+  }
+  .rail:hover .rail__panel,
+  .rail:focus-within .rail__panel {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  @media (prefers-reduced-motion: reduce) { .rail__panel { transition: none; } }
+
+  .tgl {
+    font: inherit;
+    width: 3rem;
+    height: 3rem;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    color: var(--ptext);
+    background: var(--panel-2);
+    border: 1px solid var(--edge);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 0;
+  }
+  /* No hover recolouring on the rail buttons - the circles keep their own colour. */
+  .tgl:focus-visible { outline: 3px solid var(--m4d); outline-offset: 2px; }
+  .tgl svg { width: 1.35rem; height: 1.35rem; display: block; }
+
+  /* The theme button previews the mode it switches TO, like the team button does.
+     Its day face is inverted: the beige of the light background, with a dark sun. */
+  .tgl--theme.is-day { background: var(--beige); border-color: var(--beige); color: #2C2620; }
+
+  /* RED/BLU swap button - the CIRCLE carries the team colour, the letter is
+     knocked out of it in the rail's own colour. It shows the team you'd switch
+     TO, not the one you're on: --pos reads blue by default and red once swapped. */
+  .tgl--teams {
+    background: var(--pos);
+    border-color: var(--pos);
+    color: var(--panel);
+  }
+  .tgl--teams span {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.6rem;
+    line-height: 1;
+    letter-spacing: 0.03em;
+  }
+
+  /* ================= hero plate ================= */
+  .plate {
+    position: relative;
+    color: var(--ptext);
+    background:
+      radial-gradient(circle at 14px 14px, var(--edge-hi) 2.5px, transparent 3px),
+      radial-gradient(circle at calc(100% - 14px) 14px, var(--edge-hi) 2.5px, transparent 3px),
+      radial-gradient(circle at 14px calc(100% - 14px), var(--edge-hi) 2.5px, transparent 3px),
+      radial-gradient(circle at calc(100% - 14px) calc(100% - 14px), var(--edge-hi) 2.5px, transparent 3px),
+      linear-gradient(170deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--edge);
+    padding: clamp(1.75rem, 5vw, 3.25rem) clamp(1.25rem, 5vw, 3.25rem) clamp(1.75rem, 4vw, 2.5rem);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    animation: rise 0.5s ease-out both;
+  }
+  .plate::after {
+    content: "";
+    position: absolute;
+    inset: 7px;
+    border: 1px solid var(--edge);
+    pointer-events: none;
+    opacity: 0.55;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .plate { animation: none; } }
+
+  .eyebrow {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--pdim);
+    margin: 0;
+  }
+
+  .wordmark {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(3rem, 12vw, 7rem);
+    line-height: 0.86;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+    margin: 0;
+    color: var(--ptext);
+    text-wrap: balance;
+  }
+  .wordmark em { font-style: normal; color: var(--m4d); }
+
+  .tagline { margin: 0; max-width: var(--measure); color: var(--pdim); font-size: 1.0625em; }
+
+  .rule {
+    height: 6px;
+    border: 0;
+    margin: 0;
+    background: repeating-linear-gradient(135deg, var(--accent) 0 7px, transparent 7px 15px);
+    opacity: 0.65;
+  }
+
+  /* ================= download ================= */
+  .getit { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem 1.5rem; }
+
+  .dl {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    text-decoration: none;
+    background: var(--accent);
+    color: var(--accent-d);
+    padding: 0.85rem 1.75rem;
+    border: 1px solid var(--accent);
+    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.4);
+    transition: transform 0.09s ease, box-shadow 0.09s ease;
+  }
+  .dl:hover { transform: translateY(-2px); box-shadow: 0 5px 0 rgba(0, 0, 0, 0.4); }
+  .dl:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4); }
+  .dl:focus-visible { outline: 3px solid var(--m4d); outline-offset: 3px; }
+  @media (prefers-reduced-motion: reduce) {
+    .dl, .dl:hover, .dl:active { transition: none; transform: none; }
+  }
+
+  .dl b {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.6rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    line-height: 1.1;
+  }
+  .dl span {
+    font-size: 0.75rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.85;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pending { margin: 0; font-size: 0.8125rem; color: var(--pdim); max-width: 22ch; }
+
+  /* ================= sections ================= */
+  section { display: flex; flex-direction: column; gap: 1.25rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(1.75rem, 4.5vw, 2.5rem);
+    line-height: 1;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin: 0;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  h2::after { content: ""; flex: 1; height: 1px; background: var(--ink-rule); }
+
+  p { margin: 0; max-width: var(--measure); }
+  .lede { color: var(--ink-dim); }
+
+  /* ================= requirement cards ================= */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1rem;
+  }
+  .card {
+    background: var(--panel);
+    color: var(--ptext);
+    border: 1px solid var(--edge);
+    padding: 1.25rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+  .card h3 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.375rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    line-height: 1.15;
+    margin: 0;
+    color: var(--accent);
+  }
+  .card p { font-size: 0.9375em; }
+  .req {
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--m4d);
+    font-weight: 700;
+  }
+
+  /* ================= steps ================= */
+  .steps {
+    list-style: none;
+    counter-reset: step;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 2.75rem 1fr;
+    gap: 1rem;
+    align-items: start;
+  }
+  .steps li::before {
+    content: counter(step);
+    font-family: var(--display);
+    font-size: 1.75rem;
+    line-height: 1.35;
+    text-align: center;
+    color: var(--accent-d);
+    background: var(--accent);
+  }
+  .steps strong { display: block; color: var(--ink); }
+  .steps small {
+    display: block;
+    color: var(--ink-dim);
+    font-size: 0.875rem;
+    max-width: var(--measure);
+  }
+
+  /* ================= host / join ================= */
+  .versus {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 1rem;
+  }
+  .side {
+    background: var(--panel);
+    color: var(--ptext);
+    border: 1px solid var(--edge);
+    border-top: 4px solid var(--team);
+    padding: 1.25rem 1.35rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .side--host { --team: var(--neg); }
+  .side--join { --team: var(--pos); }
+  .side h3 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 0;
+    color: var(--team);
+  }
+  .side p { font-size: 0.9375em; }
+
+  code, pre { font-family: var(--mono); font-size: 0.9375em; }
+  pre {
+    margin: 0;
+    background: var(--code-bg);
+    color: var(--ptext);
+    border: 1px solid var(--edge);
+    border-left: 3px solid var(--team, var(--accent));
+    padding: 0.7rem 0.9rem;
+    overflow-x: auto;
+  }
+  pre .prompt { color: var(--pdim); user-select: none; }
+  code.inline { background: var(--panel-2); color: var(--ptext); border: 1px solid var(--edge); padding: 0.05em 0.35em; }
+
+  /* ================= class carousel ================= */
+  .band {
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    background: var(--band);
+    border-top: 1px solid var(--ink-rule);
+    border-bottom: 1px solid var(--ink-rule);
+    padding: 1rem 0 0.55rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .stage { position: relative; }
+
+  .track {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.75rem;
+    padding-inline: var(--gutter);
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    scrollbar-color: transparent transparent; /* block the inherited value from html */
+    cursor: grab;
+    touch-action: pan-y;
+    transition: filter 0.4s ease;
+  }
+  .track::-webkit-scrollbar { display: none; }
+  .track.is-dragging { cursor: grabbing; user-select: none; }
+  .track:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+  .slide { flex: 0 0 auto; display: flex; flex-direction: column; gap: 0.55rem; }
+
+  /* class label sits directly on the pane - no panel behind it.
+     max-width:0 keeps this text from widening the slide; min-width:100% then
+     lets it fill whatever width the packed columns settle on. */
+  .slide__head {
+    min-width: 100%;
+    max-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    padding-bottom: 0.15rem;
+  }
+  .slide__title {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    margin: 0;
+    line-height: 1.2;
+    color: var(--ink-dim);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
+  .slide__ico { font-size: 0.9rem; line-height: 1; }
+  .slide__desc {
+    margin: 0;
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    color: var(--ink-dim);
+  }
+
+  /* columns are built by the packer so the bottoms come out level */
+  .slide__cols { display: flex; align-items: flex-start; gap: 0.6rem; }
+  .col { display: flex; flex-direction: column; gap: 0.6rem; width: var(--colw); flex: 0 0 auto; }
+
+  .item {
+    background: var(--panel);
+    color: var(--ptext);
+    border: 1px solid var(--edge);
+    padding: 0.7rem 0.8rem 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+  .item h4 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.125rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    margin: 0;
+    line-height: 1.1;
+    color: var(--ptext);
+  }
+  .attrs {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    font-size: 0.75rem;
+    line-height: 1.35;
+  }
+  .attrs li { padding-left: 1em; text-indent: -1em; }
+  .attrs .up { color: var(--pos); }
+  .attrs .down { color: var(--neg); }
+  .attrs .note { color: var(--pdim); }
+
+  /* held at full deflection long enough */
+  .thanks {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s ease;
+  }
+  .thanks span {
+    font-family: var(--display);
+    font-size: clamp(1.75rem, 5vw, 3.25rem);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    text-align: center;
+  }
+  .stage.is-warped .track { filter: blur(7px); }
+  .stage.is-warped .thanks { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .track, .thanks { transition: none; }
+  }
+
+  /* spring-loaded jog bar - edge to edge, only the gold thumb is visible */
+  .jog {
+    height: 0.9rem;
+    position: relative;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+  .jog__thumb {
+    position: absolute;
+    top: 0.25rem;
+    bottom: 0.25rem;
+    left: 50%;
+    width: 6rem;
+    margin-left: -3rem;
+    background: var(--accent);
+    will-change: transform;
+  }
+  .jog__thumb.is-springing { transition: transform 0.3s cubic-bezier(0.34, 1.45, 0.64, 1); }
+  .jog:focus-visible { outline: 3px solid var(--m4d); outline-offset: -2px; }
+  @media (prefers-reduced-motion: reduce) { .jog__thumb.is-springing { transition: none; } }
+
+  /* ================= roadmap ================= */
+  .plan {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: 0.75rem;
+  }
+  .plan__item {
+    border: 1px dashed var(--ink-rule);
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .plan__top { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .plan__top b {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.125rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+  .plan__cls {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent-ink);
+  }
+  .plan__item p { font-size: 0.8125rem; line-height: 1.45; color: var(--ink-dim); max-width: none; }
+
+  /* ================= forum ================= */
+  .forum {
+    background: var(--panel);
+    color: var(--ptext);
+    border: 1px solid var(--edge);
+    border-left: 4px solid var(--accent);
+    padding: 1.5rem 1.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .forum h3 {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: 1.5rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin: 0;
+    color: var(--accent);
+  }
+  .forum p { font-size: 0.9375em; color: var(--pdim); }
+  .forum ul { margin: 0; padding-left: 1.1rem; font-size: 0.9375em; color: var(--pdim); }
+  .forum li { margin-bottom: 0.3rem; }
+
+  /* ================= troubleshooting ================= */
+  .faq { margin: 0; display: flex; flex-direction: column; gap: 1rem; }
+  .faq dt { font-weight: 700; color: var(--accent-ink); }
+  .faq dd { margin: 0.2rem 0 0; max-width: var(--measure); color: var(--ink); }
+
+  footer {
+    border-top: 1px solid var(--ink-rule);
+    padding-top: 1.25rem;
+    color: var(--ink-dim);
+    font-size: 0.8125rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 40rem) {
+    .rail { display: none; }
+    :root { --colw: 13.5rem; }
+  }
+</style>
+
+<div class="rail" id="rail">
+  <div class="rail__hot"></div>
+  <nav class="rail__panel" aria-label="Site settings">
+    <button class="tgl tgl--theme" id="themeBtn" type="button" aria-label="Switch theme">
+      <span id="themeIcon" aria-hidden="true">&#9788;</span>
+    </button>
+    <button class="tgl tgl--teams" id="teamBtn" type="button" aria-pressed="false" aria-label="Swap the red and blue colours">
+      <span id="teamLetter" aria-hidden="true">B</span>
+    </button>
+    <a class="tgl" href="#roadmap" aria-label="Jump to the roadmap">
+      <!-- a supply crate: what's still nailed shut -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="3" y="6" width="18" height="14" rx="1"/>
+        <path d="M3 10h18M3 16h18M9 6v14M15 6v14"/>
+        <path d="M2 6l3-2h14l3 2"/>
+      </svg>
+    </a>
+    <a class="tgl" href="#forum" aria-label="Jump to the forum">
+      <!-- two speech bubbles -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 5.5h11v7H7.5L4.5 15v-2.5H3z"/>
+        <path d="M8.5 15.5H21v-7h-3"/>
+        <path d="M21 15.5V18l-2.5-2.5"/>
+      </svg>
+    </a>
+  </nav>
+</div>
+
+<div class="wrap">
+
+  <header class="plate">
+    <p class="eyebrow">A Team Fortress 2 overhaul mod</p>
+    <h1 class="wordmark"><em>M4D</em> Heavy TF2</h1>
+    <hr class="rule">
+    <p class="tagline">
+      Every class reworked around one idea: mark a target and the whole team gets a way
+      to punish it. Afterburn that stacks, a Pyro who can heal, an Engineer with a pet
+      drone. Runs alongside your normal TF2 &mdash; it changes nothing about your real install.
+    </p>
+    <div class="getit">
+      <a class="dl" href="M4DHeavyTF2.zip" id="download" download>
+        <b>Download</b>
+        <span>13 MB &middot; .zip &middot; Windows 64-bit</span>
+      </a>
+      <p class="pending">Windows 64-bit only. Needs TF2 and Source SDK Base 2013 Multiplayer.</p>
+    </div>
+  </header>
+
+  <section>
+    <h2>You&rsquo;ll need</h2>
+    <p class="lede">
+      Both are free, and both have to be installed in Steam before the mod will start.
+      Steam also needs to be running when you launch it.
+    </p>
+    <div class="grid">
+      <article class="card">
+        <p class="req">Required</p>
+        <h3>Team Fortress 2</h3>
+        <p>
+          The mod reads TF2&rsquo;s maps, models and sounds straight out of your install.
+          If you&rsquo;ve never launched TF2 on this machine, do that once first.
+        </p>
+      </article>
+      <article class="card">
+        <p class="req">Required</p>
+        <h3>Source SDK Base 2013 Multiplayer</h3>
+        <p>
+          This is the engine the mod actually runs on. In Steam, open your
+          <strong>Library</strong>, click the filter dropdown at the top, tick
+          <strong>Tools</strong>, then find it in the list and install it.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>Install</h2>
+    <ol class="steps">
+      <li>
+        <div>
+          <strong>Unzip it to <code class="inline">C:\Games\M4DHeavyTF2\</code>.</strong>
+          <small>
+            Make that folder if you don&rsquo;t have one. The mod writes settings, screenshots and
+            demos next to itself, so it needs somewhere you own. Avoid your Desktop or Documents
+            &mdash; on most Windows 11 machines those sync to OneDrive, which locks files mid-write.
+            Avoid Program Files, where Windows blocks writes. And keep it out of your Steam folders,
+            which get cleaned up by &ldquo;verify integrity&rdquo;.
+          </small>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Run <code class="inline">mod_tf_win64.exe</code>.</strong>
+          <small>Windows may warn you about an unknown publisher. That&rsquo;s expected for an unsigned mod build.</small>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Enjoy.</strong>
+          <small>Everything lives in your normal TF2 loadout. Nothing else to set up.</small>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Talk about it.</strong>
+          <small>Talk about it on the forums. Talk about it everywhere. Spread the word.</small>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Play together</h2>
+    <p class="lede">
+      There are no public servers &mdash; one of you hosts, the other connects.
+      Hit <code class="inline">~</code> to open the console. If nothing happens, turn it on under
+      Options &rarr; Keyboard &rarr; Advanced &rarr; Enable Developer Console.
+    </p>
+    <div class="versus">
+      <article class="side side--host">
+        <h3>You host</h3>
+        <p>Start a map, then find your IP and send it over.</p>
+        <pre><span class="prompt">&gt; </span>map ctf_2fort
+<span class="prompt">&gt; </span>status</pre>
+        <p>
+          <code class="inline">status</code> prints your address. On most home connections
+          you&rsquo;ll also need to forward <strong>UDP 27015</strong> on your router, or use
+          something like Hamachi or ZeroTier to skip that entirely.
+        </p>
+      </article>
+      <article class="side side--join">
+        <h3>You join</h3>
+        <p>Once they&rsquo;ve given you the address:</p>
+        <pre><span class="prompt">&gt; </span>connect 203.0.113.7</pre>
+        <p>
+          Swap in whatever IP they sent you. Same version on both machines or it
+          won&rsquo;t connect &mdash; grab the download from this page rather than passing
+          files around.
+        </p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>What&rsquo;s changed</h2>
+    <p class="lede">Class by class. Drag it, wheel over it, or pull the gold bar &mdash; it loops forever.</p>
+
+    <div class="band">
+      <div class="stage" id="stage">
+        <div class="track" id="track" tabindex="0" aria-label="Class changes, scrolls horizontally">
+
+          <!-- SCOUT -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128095;</span> Scout</h3>
+              <p class="slide__desc">Marks targets for the team.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item">
+                <h4>Wrap Assassin</h4>
+                <ul class="attrs">
+                  <li class="up">+ Applies Marked For Death on hit</li>
+                  <li class="up">+ The mark lands through the splash</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Force-a-Nature</h4>
+                <ul class="attrs">
+                  <li class="up">+ Knocks enemies back on hit</li>
+                  <li class="up">+ 100% faster firing</li>
+                  <li class="up">+ 20% more pellets</li>
+                  <li class="up">+ Switches in and out 66% faster</li>
+                  <li class="down">&minus; 30% damage penalty</li>
+                  <li class="down">&minus; 2 shells in the clip</li>
+                  <li class="down">&minus; Reloads both shells at once</li>
+                                  <li class="up">+ Reloads passively, even holstered</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Shortstop</h4>
+                <ul class="attrs">
+                  <li class="up">+ No reload slowdown</li>
+                  <li class="up">+ No extra knockback vulnerability</li>
+                  <li class="note">Rolled back to its 2011 balance</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Sandman</h4>
+                <ul class="attrs">
+                  <li class="up">+ 25 max health</li>
+                  <li class="up">+ 65 damage a swing</li>
+                  <li class="down">&minus; 37.5% slower swing</li>
+                  <li class="down">&minus; No double jump</li>
+                  <li class="down">&minus; 13% slower unless it&rsquo;s out</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Pocket Pistol</h4>
+                <ul class="attrs">
+                  <li class="up">+ On hit: 2.5% of your current health</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- SOLDIER -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128640;</span> Soldier</h3>
+              <p class="slide__desc">Rewarded for the hard shot, not the easy one.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item item--pin">
+                <h4>Class-wide</h4>
+                <ul class="attrs">
+                  <li class="down">&minus; Buff Banners disabled</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Direct Hit</h4>
+                <ul class="attrs">
+                  <li class="up">+ 30% more damage to marked targets</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Black Box</h4>
+                <ul class="attrs">
+                  <li class="up">+ On hit: 15 health</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Market Gardener</h4>
+                <ul class="attrs">
+                  <li class="up">+ Crits while you&rsquo;re airborne</li>
+                  <li class="up">+ Crits marked targets</li>
+                  <li class="up">+ 20% melee range</li>
+                  <li class="down">&minus; 20% slower swing</li>
+                  <li class="down">&minus; No random crits</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Liberty Launcher</h4>
+                <ul class="attrs">
+                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="up">+ 30% less damage to yourself from blast jumps</li>
+                  <li class="down">&minus; 25% smaller clip</li>
+                  <li class="note">Every other stock stat stripped off it</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Equalizer</h4>
+                <ul class="attrs">
+                  <li class="up">+ Escape Plan folded back into it</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- PYRO -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128293;</span> Pyro</h3>
+              <p class="slide__desc">Fire stacks, and can be pointed at your own team.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item item--pin">
+                <h4>Class-wide</h4>
+                <ul class="attrs">
+                  <li class="down">&minus; No +20 health for extinguishing a teammate</li>
+                  <li class="up">+ Every flare gun reloads passively</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Volcano Fragment</h4>
+                <ul class="attrs">
+                  <li class="up">+ Flames and flares heal teammates</li>
+                  <li class="up">+ Healing overheals past max health</li>
+                  <li class="up">+ Afterburn heals allies over time</li>
+                  <li class="up">+ Marks whoever you hit with it</li>
+                  <li class="down">&minus; Afterburn does no enemy damage</li>
+                  <li class="note">You thought a permanently molten but holdable perfectly shaped axe of magma wasn&rsquo;t magic?</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Scorch Shot</h4>
+                <ul class="attrs">
+                  <li class="up">+ Bigger blast, ignites the whole radius</li>
+                  <li class="up">+ Full crits burning targets &mdash; 45</li>
+                  <li class="down">&minus; 50% damage penalty &mdash; 15 base</li>
+                  <li class="down">&minus; No knockback, stun or ricochet</li>
+                                  <li class="up">+ Reloads passively, even holstered</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Man Melter</h4>
+                <ul class="attrs">
+                  <li class="up">+ Crits burning targets</li>
+                  <li class="up">+ 35% more damage to marked targets</li>
+                  <li class="down">&minus; Strips afterburn off whoever you hit</li>
+                                  <li class="up">+ Reloads passively, even holstered</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- DEMOMAN -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128163;</span> Demoman</h3>
+              <p class="slide__desc">Fewer explosives out, each one worth more.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item">
+                <h4>Scottish Resistance</h4>
+                <ul class="attrs">
+                  <li class="up">+ Fires on Shift while stowed</li>
+                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="up">+ No self-damage from its stickies</li>
+                  <li class="up">+ 30% resist to your own explosives</li>
+                  <li class="up">+ Marks what it hits for 1 second</li>
+                  <li class="up">+ 25% faster firing</li>
+                  <li class="down">&minus; 2 in the clip, 2 on the ground</li>
+                  <li class="down">&minus; 50% damage penalty</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Loch-n-Load</h4>
+                <ul class="attrs">
+                  <li class="up">+ 30% more damage to marked targets</li>
+                  <li class="up">+ Detonates on walls at half damage</li>
+                  <li class="down">&minus; 2 grenades in the clip</li>
+                                  <li class="up">+ Reloads passively, even holstered</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Skullcutter</h4>
+                <ul class="attrs">
+                  <li class="up">+ Cleaves through multiple enemies</li>
+                  <li class="up">+ 20% damage bonus</li>
+                  <li class="down">&minus; 10% slower even when holstered</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- HEAVY -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#129386;</span> Heavy</h3>
+              <p class="slide__desc">Natascha and the GRU together make the Fat Scout.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item">
+                <h4>Natascha</h4>
+                <ul class="attrs">
+                  <li class="up">+ No spin-up &mdash; fires instantly</li>
+                  <li class="up">+ 14 pellets a blast</li>
+                  <li class="up">+ No slowdown while spun up</li>
+                  <li class="down">&minus; 50% damage penalty</li>
+                  <li class="down">&minus; 50 ammo</li>
+                  <li class="down">&minus; ~0.9s between blasts</li>
+                  <li class="down">&minus; No slow-on-hit, no damage resist</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Buffalo Steak Sandvich</h4>
+                <ul class="attrs">
+                  <li class="up">+ 9% damage resistance per second you spend eating</li>
+                  <li class="up">+ Up to 36% if you finish the whole animation</li>
+                  <li class="down">&minus; Marks you for death from the first bite</li>
+                  <li class="note">Every stock stat stripped off it. Break out early for less of both.</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Banana</h4>
+                <ul class="attrs">
+                  <li class="up">+ 5 seconds of speed boost for eating it</li>
+                  <li class="up">+ Throw it to hand that boost to a teammate</li>
+                  <li class="down">&minus; Eating it costs you 50 health</li>
+                  <li class="note">Every other stock stat stripped off it</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Dalokohs Bar</h4>
+                <ul class="attrs">
+                  <li class="up">+ 50 health and a quarter of your primary ammo</li>
+                  <li class="up">+ Ready again every 5 seconds</li>
+                  <li class="note">Every other stock stat stripped off it</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Gloves of Running Urgently</h4>
+                <ul class="attrs">
+                  <li class="up">+ 30% faster while they&rsquo;re out</li>
+                  <li class="up">+ No health drain while active</li>
+                  <li class="down">&minus; 50 max health while equipped</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- ENGINEER -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128295;</span> Engineer</h3>
+              <p class="slide__desc">A nest, or a companion. Not both.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item">
+                <h4>Caller</h4>
+                <ul class="attrs">
+                  <li class="note">Deploys a drone that follows you, your entire suite of buildings in one gadget.</li>
+                </ul>
+              </article>
+                            <article class="item">
+                <h4>Wrangler</h4>
+                <ul class="attrs">
+                  <li class="up">+ Shield on demand &mdash; Shift or Reload</li>
+                  <li class="up">+ M2 still fires level-3 rockets</li>
+                  <li class="down">&minus; 5s up, 20s cooldown</li>
+                  <li class="down">&minus; No permanent shield while wrangling</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Eureka Effect</h4>
+                <ul class="attrs">
+                  <li class="up">+ Teleporters work both ways</li>
+                  <li class="up">+ Walk into the exit to come back to the entrance</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Southern Hospitality</h4>
+                <ul class="attrs">
+                  <li class="up">+ Dispensers heal 50% faster</li>
+                  <li class="up">+ Triple dispenser range</li>
+                  <li class="down">&minus; Sentries stop at level 2</li>
+                  <li class="down">&minus; Dispensers cost 130 metal</li>
+                  <li class="note">Dispenser figures compare against a normal dispenser of the same level</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Short Circuit</h4>
+                <ul class="attrs">
+                  <li class="up">+ Recharges passively</li>
+                  <li class="note">Runs on a meter like the Cow Mangler</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Pomson 6000</h4>
+                <ul class="attrs">
+                  <li class="up">+ Continuous beam instead of orbs</li>
+                  <li class="up">+ Damages buildings normally again</li>
+                  <li class="down">&minus; Overheats, then locks out to cool</li>
+                  <li class="down">&minus; No longer drains &uuml;ber or cloak</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- MEDIC -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#10133;</span> Medic</h3>
+              <p class="slide__desc">A resource to spend, not an &uuml;ber to bank.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item item--pin">
+                <h4>Class-wide</h4>
+                <ul class="attrs">
+                  <li class="down">&minus; Patients no longer give the Medic a speed buff</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Vaccinator</h4>
+                <ul class="attrs">
+                  <li class="up">+ M2 beam heals an ally or drains an enemy</li>
+                  <li class="up">+ Draining overheals you for half the damage</li>
+                  <li class="up">+ Starts full, refills while holstered</li>
+                  <li class="up">+ 900-unit beam range</li>
+                  <li class="down">&minus; Drains empty in about 8 seconds</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Boltsauger</h4>
+                <ul class="attrs">
+                  <li class="up">+ Fires bolts that can headshot</li>
+                  <li class="up">+ Crits marked targets</li>
+                  <li class="up">+ 50% faster projectiles</li>
+                  <li class="down">&minus; 33% damage penalty</li>
+                  <li class="down">&minus; A single bolt loaded</li>
+                  <li class="note">The Blutsauger, rebuilt as a crossbow</li>
+                                  <li class="up">+ Reloads passively, even holstered</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Overdose</h4>
+                <ul class="attrs">
+                  <li class="up">+ Fires energy pulses from the primary slot</li>
+                  <li class="up">+ Knockback on hit</li>
+                                  <li class="up">+ Reloads passively, even holstered</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Transfuser</h4>
+                <ul class="attrs">
+                  <li class="up">+ On hit: 65 overheal</li>
+                  <li class="note">A plain bonesaw otherwise</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Quick-Fix</h4>
+                <ul class="attrs">
+                  <li class="up">+ Keeps its speed with no patient</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- SNIPER -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#127919;</span> Sniper</h3>
+              <p class="slide__desc">Aim over patience.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item">
+                <h4>Bazaar Bargain</h4>
+                <ul class="attrs">
+                  <li class="up">+ Headshots from the hip</li>
+                  <li class="up">+ Flat 50 body, 150 head, any range</li>
+                  <li class="down">&minus; Cannot scope, so it never charges</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Darwin&rsquo;s Danger Shield</h4>
+                <ul class="attrs">
+                  <li class="up">+ 25 max health</li>
+                  <li class="down">&minus; 30% more damage taken while marked</li>
+                  <li class="down">&minus; 50% more crit damage taken</li>
+                  <li class="down">&minus; No fire immunity or resistance</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Shahanshah</h4>
+                <ul class="attrs">
+                  <li class="up">+ Knocks the target back on hit</li>
+                  <li class="up">+ Swing mid-air to launch yourself</li>
+                  <li class="up">+ 25% damage below half health</li>
+                  <li class="down">&minus; 25% damage above half health</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Huntsman</h4>
+                <ul class="attrs">
+                  <li class="up">+ 25 max health</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Cozy Camper</h4>
+                <ul class="attrs">
+                  <li class="up">+ Keeps its no-flinch and knockback resist</li>
+                  <li class="down">&minus; Passive health regen removed</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- SPY -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128481;</span> Spy</h3>
+              <p class="slide__desc">The mark is his key to the map.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item item--pin">
+                <h4>Class-wide</h4>
+                <ul class="attrs">
+                  <li class="up">+ Any knife backstabs a marked target from any angle</li>
+                  <li class="down">&minus; Razorback and shields still block it</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Ice-Tip</h4>
+                <ul class="attrs">
+                  <li class="up">+ 50 max health</li>
+                  <li class="up">+ 65 damage a swing</li>
+                  <li class="down">&minus; Backstabs crit for ~195, no instant kill</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Ambassador</h4>
+                <ul class="attrs">
+                  <li class="up">+ Headshots crit at any range again</li>
+                  <li class="note">Rolled back to before the 2017 nerf</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Dead Ringer</h4>
+                <ul class="attrs">
+                  <li class="up">+ Ammo and dispensers refill cloak again</li>
+                  <li class="down">&minus; Triggering hit reduced 50%, not 75%</li>
+                  <li class="note">Rolled back to July 2015</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+          <!-- ALL-CLASS -->
+          <section class="slide">
+            <div class="slide__head">
+              <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#127758;</span> All-Class</h3>
+              <p class="slide__desc">The systems underneath everything.</p>
+            </div>
+            <div class="slide__cols">
+              <article class="item">
+                <h4>Marked For Death</h4>
+                <ul class="attrs">
+                  <li class="up">+ No falloff &mdash; full damage at any range</li>
+                  <li class="up">+ Glows through walls for your team</li>
+                  <li class="note">Around thirty items key off the mark</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Stacking afterburn</h4>
+                <ul class="attrs">
+                  <li class="up">+ Stacks 10 times, 1 damage/sec each</li>
+                  <li class="up">+ Every flame hit adds a stack</li>
+                  <li class="down">&minus; Applies to every fire source</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Panic Attack</h4>
+                <ul class="attrs">
+                  <li class="up">+ Dumps its whole clip in one burst</li>
+                  <li class="up">+ 200% faster firing</li>
+                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="down">&minus; 50% clip size</li>
+                  <li class="down">&minus; 100% more spread, and it climbs every shot</li>
+                  <li class="down">&minus; 100% reload speed</li>
+                  <li class="note">Every other stock stat stripped off it</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Reserve Shooter</h4>
+                <ul class="attrs">
+                  <li class="up">+ 15% damage bonus</li>
+                  <li class="up">+ 20% faster to deploy</li>
+                  <li class="down">&minus; 2 shells off the clip</li>
+                </ul>
+              </article>
+            </div>
+          </section>
+
+        </div>
+
+        <div class="thanks" aria-hidden="true"><span>Thanks for playing</span></div>
+      </div>
+
+      <div class="jog" id="jog" tabindex="0" role="slider" aria-label="Scroll the class list" aria-valuemin="-100" aria-valuemax="100" aria-valuenow="0">
+        <div class="jog__thumb" id="thumb"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="roadmap">
+    <h2>On the workbench</h2>
+    <p class="lede">
+      Where the weapons we haven&rsquo;t rebuilt yet are headed, straight from the design doc.
+      None of this is in the download &mdash; treat it as a wishlist you&rsquo;re allowed to argue with.
+    </p>
+    <div class="plan">
+        <article class="plan__item">
+          <div class="plan__top"><b>Baby Face Blaster</b><span class="plan__cls">Scout</span></div>
+          <p>Trade the double jump for the ability to bunnyhop &mdash; a pure momentum Scout that snowballs speed as you land shots.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Crit-a-Cola</b><span class="plan__cls">Scout</span></div>
+          <p>No respawn recharge; instead of the mini-crit vulnerability it applies Marked For Death on hit.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Bonk! Atomic Punch</b><span class="plan__cls">Scout</span></div>
+          <p>No respawn recharge; M1 for invulnerability, M2 to make nearby allies crit-immune &mdash; but you&rsquo;re grounded while it&rsquo;s active.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Cow Mangler 5000</b><span class="plan__cls">Soldier</span></div>
+          <p>The charged shot marks targets instead of igniting; slower reload; can no longer disable buildings.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Beggar&rsquo;s Bazooka</b><span class="plan__cls">Soldier</span></div>
+          <p>Kill the recoil drift so the loaded barrage actually goes where you aim.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Dragon&rsquo;s Fury</b><span class="plan__cls">Pyro</span></div>
+          <p>Airblast reflections speed up your reload &mdash; the deflect becomes the reward.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Gas Passer</b><span class="plan__cls">Pyro</span></div>
+          <p>No respawn recharge; leaves a lingering, ignitable cloud with a clearly telegraphed radius.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Sticky Jumper</b><span class="plan__cls">Demoman</span></div>
+          <p>Eight stickies in the clip for longer, higher jump chains.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Ullapool Caber</b><span class="plan__cls">Demoman</span></div>
+          <p>Explodes on contact with heavier self-damage; possibly opened up as an all-class weapon.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Tomislav</b><span class="plan__cls">Heavy</span></div>
+          <p>Accuracy-rewarding: a tight bullet spread and possible headshots, at the cost of close-range shredding.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Fists of Steel</b><span class="plan__cls">Heavy</span></div>
+          <p>Redesigned as a riot shield &mdash; spool M2 to grant your whole team a Battalion&rsquo;s Backup buff.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Huo-Long Heater</b><span class="plan__cls">Heavy</span></div>
+          <p>Marks enemies and deals bonus damage to marked targets, with a heat-up ring mechanic.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Defibrillator</b><span class="plan__cls">Medic</span></div>
+          <p>No damage at all &mdash; stuns or speed-boosts on hit, revives allies, taunt-kills, and recharges by taunting.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Solemn Vow</b><span class="plan__cls">Medic</span></div>
+          <p>Marks undisguised enemies and anyone who recently damaged you; heals an ally on hit.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Machina</b><span class="plan__cls">Sniper</span></div>
+          <p>Full body-penetration, a permanent tracer, and it only fires while scoped.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Jarate</b><span class="plan__cls">Sniper</span></div>
+          <p>Grounds soaked targets in the puddle, breaks status effects, and applies Marked For Death.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Enforcer</b><span class="plan__cls">Spy</span></div>
+          <p>Pierces damage resistance, crits marked targets, and grants health &amp; cloak &mdash; with a weaker backstab.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>EMP Sapper</b><span class="plan__cls">Spy</span></div>
+          <p>A thrown, Gas-Passer-style AoE that saps buildings and marks everything caught in the radius.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Cloak &amp; Dagger</b><span class="plan__cls">Spy</span></div>
+          <p>Walk straight through enemies and shrug off milk &amp; fire while you&rsquo;re invisible.</p>
+        </article>
+        <article class="plan__item">
+          <div class="plan__top"><b>Panic Attack</b><span class="plan__cls">All-Class</span></div>
+          <p>Built, but the burst feel and the consecutive-spread climb still want a playtest pass.</p>
+        </article>
+    </div>
+  </section>
+
+  <section id="forum">
+    <h2>The forum</h2>
+    <div class="forum">
+      <h3>Not open yet</h3>
+      <p>
+        There&rsquo;s no forum behind this link so far &mdash; no threads, no votes, no accounts.
+        Rather than fake a busy comment section, here&rsquo;s the honest version: the argument is
+        happening wherever you already are.
+      </p>
+      <ul>
+        <li>Tell us which of the changes above miss, and why.</li>
+        <li>Pick fights with the roadmap &mdash; most of it isn&rsquo;t built, so it&rsquo;s still cheap to change.</li>
+        <li>Report anything that breaks. Every weapon on this page needs a real playtest.</li>
+      </ul>
+      <p>When there&rsquo;s somewhere to point you, this is where the link goes.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>If something breaks</h2>
+    <dl class="faq">
+      <div>
+        <dt>It closes instantly, or won&rsquo;t launch at all.</dt>
+        <dd>Steam isn&rsquo;t running, or Source SDK Base 2013 Multiplayer isn&rsquo;t installed. Both are required. Launch the SDK Base once from Steam, then try the mod again.</dd>
+      </div>
+      <div>
+        <dt>Everything is pink and black checkerboards.</dt>
+        <dd>Team Fortress 2 isn&rsquo;t installed, or has never been run on this machine. Start TF2 normally once so Steam finishes unpacking it, then relaunch the mod.</dd>
+      </div>
+      <div>
+        <dt>An engine error about a missing .dll.</dt>
+        <dd>Same fix &mdash; run Source SDK Base 2013 Multiplayer once from your Steam library first. It installs the engine binaries the mod loads.</dd>
+      </div>
+      <div>
+        <dt>We can&rsquo;t connect to each other.</dt>
+        <dd>Check you&rsquo;re both on this exact build. After that it&rsquo;s almost always the router &mdash; forward UDP 27015 on the host&rsquo;s side, or put both machines on a Hamachi or ZeroTier network and connect to the address it gives you.</dd>
+      </div>
+    </dl>
+  </section>
+
+  <footer>
+    <span>M4D Heavy TF2</span>
+    <span>Build 2026.07.28</span>
+    <span>Windows 64-bit</span>
+    <span>Requires Team Fortress 2 + Source SDK Base 2013 Multiplayer</span>
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- theme ---------- */
+  var root = document.documentElement;
+  var btn = document.getElementById("themeBtn");
+  var icon = document.getElementById("themeIcon");
+
+  function currentTheme() {
+    if (root.dataset.theme) return root.dataset.theme;
+    return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+  // The button shows the mode it will switch you TO, not the one you're in: a moon while it's
+  // day, a sun while it's night. The sun face also flips to the light theme's own beige with a
+  // dark glyph, so the button is a swatch of what you're about to get.
+  function paintLabel() {
+    var isLight = currentTheme() === "light";
+    icon.innerHTML = isLight ? "&#9790;" : "&#9788;";
+    btn.classList.toggle( "is-day", !isLight );
+    btn.setAttribute( "aria-label", isLight ? "Switch to night mode" : "Switch to day mode" );
+  }
+  btn.addEventListener("click", function () {
+    root.dataset.theme = currentTheme() === "light" ? "dark" : "light";
+    paintLabel();
+  });
+  paintLabel();
+
+  /* ---------- RED/BLU swap ---------- */
+  var teamBtn = document.getElementById("teamBtn");
+  var teamLetter = document.getElementById("teamLetter");
+  teamBtn.addEventListener("click", function () {
+    var swapped = root.dataset.teams === "swapped";
+    if (swapped) delete root.dataset.teams;
+    else root.dataset.teams = "swapped";
+    teamLetter.textContent = swapped ? "B" : "R";
+    teamBtn.setAttribute("aria-pressed", swapped ? "false" : "true");
+  });
+
+  /* ---------- carousel ---------- */
+  var track = document.getElementById("track");
+  var stage = document.getElementById("stage");
+  var jog = document.getElementById("jog");
+  var thumb = document.getElementById("thumb");
+  if (!track) return;
+
+  var MAX_JOG_SPEED = 260;  // px/frame at full deflection - deliberately absurd
+  var JOG_CURVE = 3;        // cubic: gentle near the middle, wild at the ends
+  var WHEEL_GAIN = 0.30;
+  var MAX_VEL = 110;
+  var FRICTION = 0.94;
+  var GAP = 10;             // matches the .col gap, for packing maths
+  var PIN_RATIO = 0.92;     // "held all the way over"
+  var PIN_MS = 1500;        // ...for this long -> blur + thanks
+
+  /* Pack each class's panels into columns so the bottoms come out level:
+     sort tallest-first, then always drop the next panel into the shortest
+     column. Reading order inside a column is restored afterwards. */
+  var slides = [].slice.call(track.querySelectorAll(".slide"));
+  var panelStore = slides.map(function (slide) {
+    return [].slice.call(slide.querySelectorAll(".item"));
+  });
+
+  function packSlide(slide, all) {
+    var host = slide.querySelector(".slide__cols");
+    if (!host || !all.length) return;
+
+    // the class-wide panel always sits first in column one; the weapons pack around it
+    var pinned = all.filter(function (it) { return it.classList.contains("item--pin"); });
+    var items = all.filter(function (it) { return !it.classList.contains("item--pin"); });
+    if (!items.length) { items = pinned; pinned = []; }
+
+    host.textContent = "";
+    var probe = document.createElement("div");
+    probe.className = "col";
+    pinned.concat(items).forEach(function (it) { probe.appendChild(it); });
+    host.appendChild(probe);
+
+    var pinHeight = pinned.reduce(function (t, it) { return t + it.offsetHeight + GAP; }, 0);
+    var heights = items.map(function (it) { return it.offsetHeight; });
+    var nCols = Math.max(1, Math.ceil(all.length / 4));
+    var cols = [], totals = [];
+    for (var i = 0; i < nCols; i++) { cols.push([]); totals.push(0); }
+    totals[0] = pinHeight; // column one starts already part-full
+
+    items
+      .map(function (_, i) { return i; })
+      .sort(function (a, b) { return heights[b] - heights[a]; })
+      .forEach(function (idx) {
+        var min = 0;
+        for (var c = 1; c < nCols; c++) if (totals[c] < totals[min]) min = c;
+        cols[min].push(idx);
+        totals[min] += heights[idx] + GAP;
+      });
+
+    host.textContent = "";
+    cols.forEach(function (list, ci) {
+      list.sort(function (a, b) { return a - b; });
+      var col = document.createElement("div");
+      col.className = "col";
+      if (ci === 0) pinned.forEach(function (it) { col.appendChild(it); });
+      list.forEach(function (idx) { col.appendChild(items[idx]); });
+      host.appendChild(col);
+    });
+  }
+
+  function packAll() {
+    slides.forEach(function (slide, i) { packSlide(slide, panelStore[i]); });
+  }
+
+  /* ---------- endless loop ---------- */
+  var setWidth = 0;
+
+  /* The repeat period is the distance from the start of one set to the start of
+     the next: every slide's width plus the flex gap that follows it. It is NOT
+     track.scrollWidth - that also carries the track's 160px padding-inline, and
+     wrapping by that figure shifts the content a few hundred px on every lap,
+     which reads as the carousel refusing to advance. */
+  function measurePeriod() {
+    var gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+    var w = 0;
+    slides.forEach(function (s) { w += s.offsetWidth + gap; });
+    return w;
+  }
+
+  function buildLoop() {
+    [].slice.call(track.querySelectorAll("[data-clone]")).forEach(function (n) {
+      n.parentNode.removeChild(n);
+    });
+    setWidth = measurePeriod();
+    if (!setWidth) return;
+    var copies = 2;
+    while (setWidth * copies < track.clientWidth * 3) copies++;
+    for (var c = 0; c < copies; c++) {
+      slides.forEach(function (node) {
+        var clone = node.cloneNode(true);
+        clone.setAttribute("data-clone", "1");
+        clone.setAttribute("aria-hidden", "true");
+        track.appendChild(clone);
+      });
+    }
+    track.scrollLeft = setWidth;
+  }
+
+  function wrap() {
+    if (!setWidth) return;
+    if (track.scrollLeft >= setWidth * 2) track.scrollLeft -= setWidth;
+    else if (track.scrollLeft < setWidth) track.scrollLeft += setWidth;
+  }
+
+  packAll();
+  buildLoop();
+
+  var resizeTimer;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      [].slice.call(track.querySelectorAll("[data-clone]")).forEach(function (n) {
+        n.parentNode.removeChild(n);
+      });
+      packAll();
+      buildLoop();
+    }, 200);
+  });
+
+  /* ---------- velocity engine ---------- */
+  var vel = 0, jogVel = 0, jogRatio = 0, jogging = false, dragging = false;
+  var pinnedSince = 0;
+
+  function frame() {
+    if (jogging) {
+      track.scrollLeft += jogVel;
+    } else if (!dragging) {
+      if (Math.abs(vel) > 0.08) { track.scrollLeft += vel; vel *= FRICTION; }
+      else { vel = 0; }
+    }
+
+    // held hard over to one side for long enough? blur it out and say thanks
+    if (jogging && Math.abs(jogRatio) >= PIN_RATIO) {
+      if (!pinnedSince) pinnedSince = performance.now();
+      else if (performance.now() - pinnedSince > PIN_MS) stage.classList.add("is-warped");
+    } else if (pinnedSince) {
+      pinnedSince = 0;
+      stage.classList.remove("is-warped");
+    }
+
+    wrap();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* The wheel is DORMANT until you click inside the pane. Without this, merely scrolling
+     the page past the carousel hijacks your wheel and traps you in it - fine once you've
+     chosen to interact, hostile when you haven't. Clicking anywhere in the band (a panel,
+     the track, the jog bar) arms it; clicking anywhere else on the page disarms it again. */
+  var wheelArmed = false;
+  var band = track.closest(".band");
+
+  document.addEventListener("pointerdown", function (e) {
+    wheelArmed = !!( band && band.contains(e.target) );
+  }, true);
+
+  track.addEventListener("wheel", function (e) {
+    if (!wheelArmed) return;   // let the page scroll normally
+    var d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+    if (!d) return;
+    e.preventDefault();
+    vel += d * WHEEL_GAIN;
+    if (vel > MAX_VEL) vel = MAX_VEL;
+    if (vel < -MAX_VEL) vel = -MAX_VEL;
+  }, { passive: false });
+
+  /* grab the track */
+  var startX = 0, startLeft = 0, lastX = 0, lastT = 0, moved = 0;
+
+  track.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0) return;
+    dragging = true; vel = 0; moved = 0;
+    startX = lastX = e.clientX;
+    lastT = performance.now();
+    startLeft = track.scrollLeft;
+    track.setPointerCapture(e.pointerId);
+  });
+  track.addEventListener("pointermove", function (e) {
+    if (!dragging) return;
+    var dx = e.clientX - startX;
+    if (Math.abs(dx) > 3) { moved = Math.abs(dx); track.classList.add("is-dragging"); }
+    track.scrollLeft = startLeft - dx;
+    var now = performance.now(), dt = now - lastT;
+    if (dt > 0) vel = -(e.clientX - lastX) / dt * 16;
+    lastX = e.clientX; lastT = now;
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    track.classList.remove("is-dragging");
+    if (e && e.pointerId !== undefined && track.hasPointerCapture(e.pointerId)) {
+      track.releasePointerCapture(e.pointerId);
+    }
+  }
+  track.addEventListener("pointerup", endDrag);
+  track.addEventListener("pointercancel", endDrag);
+  track.addEventListener("click", function (e) {
+    if (moved > 3) { e.preventDefault(); e.stopPropagation(); }
+    moved = 0;
+  }, true);
+
+  /* ---------- jog bar ---------- */
+  function jogFrom(clientX) {
+    var rect = jog.getBoundingClientRect();
+    var half = (rect.width - thumb.offsetWidth) / 2;
+    if (half <= 0) return;
+    var offset = clientX - (rect.left + rect.width / 2);
+    if (offset > half) offset = half;
+    if (offset < -half) offset = -half;
+    thumb.style.transform = "translateX(" + offset + "px)";
+    jogRatio = offset / half;
+    jogVel = Math.sign(jogRatio) * Math.pow(Math.abs(jogRatio), JOG_CURVE) * MAX_JOG_SPEED;
+    jog.setAttribute("aria-valuenow", Math.round(jogRatio * 100));
+  }
+
+  jog.addEventListener("pointerdown", function (e) {
+    jogging = true;
+    thumb.classList.remove("is-springing");
+    jog.setPointerCapture(e.pointerId);
+    jogFrom(e.clientX);
+  });
+  jog.addEventListener("pointermove", function (e) { if (jogging) jogFrom(e.clientX); });
+  function releaseJog(e) {
+    if (!jogging) return;
+    jogging = false;
+    vel = Math.max(-MAX_VEL, Math.min(MAX_VEL, jogVel)); // coast, but not at jog speed
+    jogVel = 0;
+    jogRatio = 0;
+    pinnedSince = 0;
+    stage.classList.remove("is-warped");
+    thumb.classList.add("is-springing");
+    thumb.style.transform = "translateX(0px)";
+    jog.setAttribute("aria-valuenow", 0);
+    if (e && e.pointerId !== undefined && jog.hasPointerCapture(e.pointerId)) {
+      jog.releasePointerCapture(e.pointerId);
+    }
+  }
+  jog.addEventListener("pointerup", releaseJog);
+  jog.addEventListener("pointercancel", releaseJog);
+
+  function arrowKeys(e) {
+    if (e.key === "ArrowRight") { vel += 8; e.preventDefault(); }
+    if (e.key === "ArrowLeft") { vel -= 8; e.preventDefault(); }
+  }
+  jog.addEventListener("keydown", arrowKeys);
+  track.addEventListener("keydown", arrowKeys);
+}());
+</script>
+</body>
+</html>
