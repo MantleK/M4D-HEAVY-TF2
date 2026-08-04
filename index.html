@@ -1,22 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>M4D Heavy TF2</title>
-<meta name="description" content="A Team Fortress 2 overhaul mod. Marked For Death, stacking afterburn, a Pyro who heals, and an Engineer with a pet drone.">
-<meta property="og:title" content="M4D Heavy TF2">
-<meta property="og:description" content="A Team Fortress 2 overhaul mod. Download, install steps, and how to play together.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://mantlek.github.io/M4D-HEAVY-TF2/">
-<meta name="twitter:card" content="summary">
-<style>
-  *, *::before, *::after { box-sizing: border-box; }
-  img, svg, video { max-width: 100%; height: auto; }
-</style>
 
-</head>
-<body>
+<title>M4D Heavy TF2</title>
+
 <style>
   /* Panels are ALWAYS the night colours. Only the ground under them changes
      between day and night, so the beige never touches a panel. */
@@ -100,22 +84,46 @@
 
   /* The page's own vertical scrollbar: a thin square bar and nothing else - no
      track, no groove, no end arrows.
-     Chrome/Edge/Safari get it purely through ::-webkit-scrollbar, which is the
-     only route that can delete the track and the arrow buttons outright. */
-  html::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
-  html::-webkit-scrollbar-track,
-  html::-webkit-scrollbar-track-piece { background: transparent; box-shadow: none; border: 0; }
-  html::-webkit-scrollbar-thumb { background: var(--sbar); border: 0; border-radius: 0; }
-  html::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
-  html::-webkit-scrollbar-corner { background: transparent; }
+
+     ⚠️ TWO THINGS MAKE THIS WORK, AND EARLIER VERSIONS ONLY HAD HALF OF IT.
+
+     1. The selectors are UNPREFIXED. Writing `html::-webkit-scrollbar` looks more
+        precise and was silently doing nothing: the viewport's scrollbar is styled by
+        whichever element the overflow PROPAGATED from, and while the root normally
+        wins, an HTML document hands that job to the BODY whenever the root's own
+        overflow computes to `visible` (it does - nothing sets it). `body {
+        overflow: clip overlay }` below is what transfers ownership, so every
+        html-scoped rule was being ignored and the default full-height grey track
+        came back. Unprefixed sidesteps the question - it styles whichever scroller
+        ends up owning it. `.track::-webkit-scrollbar` (the carousel) is a class
+        selector, so it still outranks these and stays hidden.
+
+     2. `overflow: overlay` on the body. This is the part that makes `transparent`
+        mean anything. A classic scrollbar reserves a GUTTER outside the content box,
+        so a see-through track just reveals whatever the canvas painted there - a
+        strip, not the page. An overlay scrollbar takes no layout space and floats
+        over the content, so the page runs edge to edge underneath it.
+        ⚠️ `overlay` is non-standard and deprecated; Chromium has been collapsing it
+        into `auto`. If that has already happened in a given browser the page simply
+        falls back to today's behaviour (a gutter the colour of --ground), which is
+        why it's written as a normal declaration rather than fenced - degrading is
+        the desired failure mode. There is no standard replacement: overlay
+        scrollbars are UA/OS-controlled on desktop. */
+  ::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-track-piece { background: transparent; box-shadow: none; border: 0; }
+  ::-webkit-scrollbar-thumb { background: var(--sbar); border: 0; border-radius: 0; }
+  ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+  ::-webkit-scrollbar-corner { background: transparent; }
 
   /* Firefox has no scrollbar pseudo-elements, so the standard properties are the
      only lever there. They are fenced off from Chrome deliberately: setting
      scrollbar-width/scrollbar-color in Chrome switches that scroller to the
      standard model and makes it IGNORE every ::-webkit-scrollbar rule above -
-     which is exactly what was putting the grey track and the up/down arrows back. */
+     which is exactly what was putting the grey track and the up/down arrows back.
+     Both elements, for the same ownership reason as (1). */
   @supports not selector(::-webkit-scrollbar) {
-    html {
+    html, body {
       scrollbar-width: thin;
       scrollbar-color: var(--sbar) transparent;
     }
@@ -129,7 +137,12 @@
     font-size: var(--step);
     line-height: 1.65;
     -webkit-text-size-adjust: 100%;
+    /* clip on x hides the full-bleed .band overhang; overlay on y is what lets the
+       transparent track show the PAGE instead of a reserved gutter. See the
+       scrollbar block above - and note this pair is also what makes body, not html,
+       the owner of the viewport scrollbar, hence the unprefixed selectors there. */
     overflow-x: clip;
+    overflow-y: overlay;
   }
 
   .wrap {
@@ -325,6 +338,159 @@
   }
 
   .pending { margin: 0; font-size: 0.8125rem; color: var(--pdim); max-width: 22ch; }
+
+
+  
+  
+  
+  
+  
+  
+  /* ================= stock comparison ================= */
+  /* Clicking a weapon panel opens the stock weapon and this build's version SIDE BY SIDE.
+     No button, no badge - the panels are obviously clickable objects and people try them.
+     Deliberately a modal rather than an in-place expansion: the slides are packed into
+     bottom-levelled columns by the script below, and growing one panel would unbalance the
+     whole slide. */
+  .item.cmpable { cursor: pointer; }
+  .item.cmpable:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  .compare {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: clamp(1rem, 4vw, 2.5rem);
+    background: rgba(0, 0, 0, 0.72);
+  }
+  .compare.is-open { display: flex; }
+
+  /* No container box and no close button: the two panels float on the backdrop with the weapon
+     name in the empty space above them, and ANYTHING that is not one of the two panels - the
+     name included - dismisses. */
+  .compare__stage {
+    width: min(46rem, 100%);
+    max-height: 100%;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .compare__stage:focus { outline: none; }
+  .compare__name {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(1.75rem, 6vw, 3rem);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    line-height: 1;
+    margin: 0;
+    text-align: center;
+    color: var(--ptext);
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.6);
+  }
+
+  .compare__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  @media (max-width: 34rem) { .compare__cols { grid-template-columns: 1fr; } }
+
+  /* Each column is a label sitting ABOVE its panel, not inside it. */
+  .compare__col { display: flex; flex-direction: column; gap: 0.4rem; }
+  .compare__side {
+    background: var(--panel);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    border: 1px solid var(--edge);
+    padding: 0.85rem 0.95rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .compare__label {
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--pdim);
+    margin: 0;
+  }
+  .compare__side ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+  .compare__side li { padding-left: 1em; text-indent: -1em; }
+  .compare__side .up { color: var(--pos); }
+  .compare__side .down { color: var(--neg); }
+  .compare__side .note, .compare__side .credit { color: var(--pdim); }
+
+  /* ================= status ================= */
+  /* Sits directly under the hero. Carries the M4D red on its edge rather than the accent gold
+     the .forum panel uses - this is the caveat panel, not a call to action, and the red is the
+     page's own colour for "marked". */
+  .status {
+    background: var(--panel);
+    color: var(--ptext);
+    border: 1px solid var(--edge);
+    border-left: 4px solid var(--m4d);
+    padding: 1.35rem 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .status__top { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+  .status__count {
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(2.25rem, 7vw, 3.25rem);
+    line-height: 0.95;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .status__count i { font-style: normal; color: var(--pdim); }
+  .status__of {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--pdim);
+  }
+  .status__bar {
+    height: 10px;
+    background: var(--code-bg);
+    border: 1px solid var(--edge);
+    position: relative;
+    overflow: hidden;
+  }
+  /* The built portion is solid; the rest is the same hazard stripe as the hero rule, so the
+     unfinished part reads as "under construction" rather than as empty track. */
+  .status__bar::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(135deg, var(--edge) 0 6px, transparent 6px 13px);
+    opacity: 0.5;
+  }
+  .status__fill { position: absolute; top: 0; bottom: 0; left: 0; background: var(--accent); z-index: 1; }
+  .status ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.9375em;
+    color: var(--pdim);
+    max-width: var(--measure);
+  }
+  .status li { padding-left: 1.1em; text-indent: -1.1em; }
+  .status li b { color: var(--ptext); font-weight: 700; }
 
   /* ================= sections ================= */
   section { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -560,6 +726,18 @@
   .attrs .up { color: var(--pos); }
   .attrs .down { color: var(--neg); }
   .attrs .note { color: var(--pdim); }
+  /* Credit lines sit last in a panel and carry the team colour, so they flip with the RED/BLU
+     switch like everything else on the page. Small caps rather than a bigger colour change -
+     the name should read as an attribution, not as another stat. */
+  .attrs .credit {
+    color: var(--pos);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding-left: 0;
+    text-indent: 0;
+    margin-top: 0.15rem;
+  }
 
   /* held at full deflection long enough */
   .thanks {
@@ -749,16 +927,53 @@
       drone. Runs alongside your normal TF2 &mdash; it changes nothing about your real install.
     </p>
     <div class="getit">
-      <!-- ABSOLUTE url on purpose. A relative "M4DHeavyTF2.zip" only resolves when the page is
-           served from the same folder as the file, so it 404s on the claude.ai artifact preview.
-           An absolute link works from every host: the artifact, GitHub Pages, and heavy.tf later. -->
-      <a class="dl" href="https://raw.githubusercontent.com/MantleK/M4D-HEAVY-TF2/main/M4DHeavyTF2.zip" id="download" download>
+      <!-- ⚠️ Points at the zip COMMITTED TO THE REPO, not a release asset, because the repo
+           has ZERO releases - the /releases/latest/download/ form 404s today (verified).
+           Preferred form once a release exists, since it auto-follows the newest build:
+           https://github.com/MantleK/M4D-HEAVY-TF2/releases/latest/download/M4DHeavyTF2.zip
+           Until then this raw/main link is the one that actually resolves. -->
+      <a class="dl" href="https://github.com/MantleK/M4D-HEAVY-TF2/raw/main/M4DHeavyTF2.zip" id="download" download>
         <b>Download</b>
         <span>13 MB &middot; .zip &middot; Windows 64-bit</span>
       </a>
-      <p class="pending">Windows 64-bit only. Needs TF2 and Source SDK Base 2013 Multiplayer.</p>
+      <p class="pending">Windows 64-bit only. Needs TF2 and Source SDK Base 2013 Multiplayer.<br>Made with AI</p>
     </div>
   </header>
+
+  <section>
+    <div class="status">
+      <div class="status__top">
+        <span class="status__count">64<i>&thinsp;/&thinsp;118</i></span>
+        <span class="status__of">items reworked, roughly</span>
+      </div>
+      <div class="status__bar"><div class="status__fill" style="width: 54%"></div></div>
+      <ul>
+        <li>
+          &mdash; <b>This is a work in progress, and not a small one.</b> A little over half the
+          planned items exist. The rest are still stock TF2, or exist only as notes.
+        </li>
+        <li>
+          &mdash; <b>The changelog on this page is behind the build.</b> Plenty of what&rsquo;s
+          finished isn&rsquo;t written up here yet, and some of what is written up has been
+          retuned since. Treat it as a sample, not an inventory.
+        </li>
+        <li>
+          &mdash; <b>Most of it has never been played.</b> It compiles and it loads; the vast
+          majority has had no real testing in a game. Expect things to be broken, badly balanced,
+          or both.
+        </li>
+        <li>
+          &mdash; Numbers move. Weapons get reworked twice. Some get cut. If something feels
+          wrong, it probably is &mdash; say so on the forum.
+        </li>
+        <li>
+          &mdash; <b>Not all contributors are credited yet.</b> They&rsquo;re already written down
+          on earlier docs, so they&rsquo;ll be added in in due time. Big shout out to
+          <b>JDUBST3P</b> and <b>FTELEY</b>, and a huge shout out to <b>Gumbozo</b>.
+        </li>
+      </ul>
+    </div>
+  </section>
 
   <section>
     <h2>You&rsquo;ll need</h2>
@@ -867,51 +1082,61 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128095;</span> Scout</h3>
-              <p class="slide__desc">Marks targets for the team.</p>
             </div>
             <div class="slide__cols">
+              <!-- Wrap Assassin removed from this slide 2026-08-03: its mark was taken away, and
+                   with it every difference from stock. Nothing left to list. -->
               <article class="item">
-                <h4>Wrap Assassin</h4>
+                <h4>Candy Cane</h4>
                 <ul class="attrs">
-                  <li class="up">+ Applies Marked For Death on hit</li>
-                  <li class="up">+ The mark lands through the splash</li>
+                  <li class="up">+ On Kill or Assist: Drop a small health pack</li>
+                  <li class="down">&minus; On Death: Drop a medium health pack</li>
+                  <li class="credit">Curated by HM</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Flying Guillotine</h4>
+                <ul class="attrs">
+                  <li class="up">+ Critical hits vs debuffed players</li>
+                  <li class="note">Burning, bleeding, jarate, milk, gas or marked &mdash; all of it counts</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Force-a-Nature</h4>
                 <ul class="attrs">
-                  <li class="up">+ Knocks enemies back on hit</li>
-                  <li class="up">+ 100% faster firing</li>
-                  <li class="up">+ 20% more pellets</li>
-                  <li class="up">+ Switches in and out 66% faster</li>
+                  <li class="up">+ Knockback on the target and shooter</li>
+                  <li class="up">+ 100% faster firing speed</li>
+                  <li class="up">+ 20% bullets per shot</li>
+                  <li class="up">+ 66% faster weapon switch</li>
                   <li class="down">&minus; 30% damage penalty</li>
-                  <li class="down">&minus; 2 shells in the clip</li>
-                  <li class="down">&minus; Reloads both shells at once</li>
-                                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="down">&minus; 66% clip size (2 shells)</li>
+                  <li class="down">&minus; This weapon reloads its entire clip at once</li>
+                                  <li class="up">+ This weapon will reload while not active</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Shortstop</h4>
                 <ul class="attrs">
-                  <li class="up">+ No reload slowdown</li>
-                  <li class="up">+ No extra knockback vulnerability</li>
+                  <li class="up">+ No reload speed penalty</li>
+                  <li class="up">+ No knockback vulnerability</li>
                   <li class="note">Rolled back to its 2011 balance</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Sandman</h4>
                 <ul class="attrs">
-                  <li class="up">+ 25 max health</li>
-                  <li class="up">+ 65 damage a swing</li>
-                  <li class="down">&minus; 37.5% slower swing</li>
-                  <li class="down">&minus; No double jump</li>
-                  <li class="down">&minus; 13% slower unless it&rsquo;s out</li>
+                  <li class="up">+ 25 max health on wearer</li>
+                  <li class="up">+ 65 damage per hit</li>
+                  <li class="down">&minus; 37.5% slower firing speed</li>
+                  <li class="down">&minus; Wearer no longer has double jump</li>
+                  <li class="down">&minus; 13% slower move speed on wearer</li>
+                  <li class="credit">Curated by HM</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Pocket Pistol</h4>
                 <ul class="attrs">
-                  <li class="up">+ On hit: 2.5% of your current health</li>
+                  <li class="up">+ On Hit: Gain 2.5% of your current health</li>
                 </ul>
               </article>
             </div>
@@ -921,7 +1146,6 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128640;</span> Soldier</h3>
-              <p class="slide__desc">Rewarded for the hard shot, not the easy one.</p>
             </div>
             <div class="slide__cols">
               <article class="item item--pin">
@@ -933,31 +1157,31 @@
               <article class="item">
                 <h4>Direct Hit</h4>
                 <ul class="attrs">
-                  <li class="up">+ 30% more damage to marked targets</li>
+                  <li class="up">+ Deals 30% increased damage to Marked-For-Death targets</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Black Box</h4>
                 <ul class="attrs">
-                  <li class="up">+ On hit: 15 health</li>
+                  <li class="up">+ On Hit: Gain 15 health</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Market Gardener</h4>
                 <ul class="attrs">
-                  <li class="up">+ Crits while you&rsquo;re airborne</li>
-                  <li class="up">+ Crits marked targets</li>
+                  <li class="up">+ Critical hits while the wielder is airborne</li>
+                  <li class="up">+ Critical hits vs Marked-For-Death targets</li>
                   <li class="up">+ 20% melee range</li>
-                  <li class="down">&minus; 20% slower swing</li>
-                  <li class="down">&minus; No random crits</li>
+                  <li class="down">&minus; 20% slower firing speed</li>
+                  <li class="down">&minus; No random critical hits</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Liberty Launcher</h4>
                 <ul class="attrs">
-                  <li class="up">+ Reloads passively, even holstered</li>
-                  <li class="up">+ 30% less damage to yourself from blast jumps</li>
-                  <li class="down">&minus; 25% smaller clip</li>
+                  <li class="up">+ This weapon will reload while not active</li>
+                  <li class="up">+ 30% blast jump damage reduction</li>
+                  <li class="down">&minus; 25% clip size</li>
                   <li class="note">Every other stock stat stripped off it</li>
                 </ul>
               </article>
@@ -967,6 +1191,26 @@
                   <li class="up">+ Escape Plan folded back into it</li>
                 </ul>
               </article>
+              <article class="item">
+                <h4>Cow Mangler 5000</h4>
+                <ul class="attrs">
+                  <li class="up">+ Alt-Fire: Marks all players in the blast for death</li>
+                  <li class="up">+ Full damage to buildings</li>
+                  <li class="up">+ This weapon will reload while not active</li>
+                  <li class="down">&minus; Alt-Fire no longer mini-crits</li>
+                  <li class="down">&minus; 25% clip size (3 shots)</li>
+                  <li class="note">The charge buys the mark now, not the damage</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Beggar&rsquo;s Bazooka</h4>
+                <ul class="attrs">
+                  <li class="up">+ No projectile spread</li>
+                  <li class="up">+ Can be put away loaded</li>
+                  <li class="down">&minus; Holding 2 or more loaded rockets marks the wielder for death</li>
+                  <li class="note">Stowing it doesn&rsquo;t hide the mark</li>
+                </ul>
+              </article>
             </div>
           </section>
 
@@ -974,14 +1218,21 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128293;</span> Pyro</h3>
-              <p class="slide__desc">Fire stacks, and can be pointed at your own team.</p>
             </div>
             <div class="slide__cols">
               <article class="item item--pin">
                 <h4>Class-wide</h4>
                 <ul class="attrs">
                   <li class="down">&minus; No +20 health for extinguishing a teammate</li>
-                  <li class="up">+ Every flare gun reloads passively</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Axtinguisher</h4>
+                <ul class="attrs">
+                  <li class="up">+ Critical hits vs burning players (120)</li>
+                  <li class="up">+ No longer eats the afterburn it cashes in</li>
+                  <li class="down">&minus; 40 damage vs players who are not burning</li>
+                  <li class="note">Back to crits, not the mini-crit rewrite</li>
                 </ul>
               </article>
               <article class="item">
@@ -993,25 +1244,26 @@
                   <li class="up">+ Marks whoever you hit with it</li>
                   <li class="down">&minus; Afterburn does no enemy damage</li>
                   <li class="note">You thought a permanently molten but holdable perfectly shaped axe of magma wasn&rsquo;t magic?</li>
+                  <li class="credit">A LOT OF CURATION</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Scorch Shot</h4>
                 <ul class="attrs">
                   <li class="up">+ Bigger blast, ignites the whole radius</li>
-                  <li class="up">+ Full crits burning targets &mdash; 45</li>
-                  <li class="down">&minus; 50% damage penalty &mdash; 15 base</li>
+                  <li class="up">+ Critical hits vs burning players (45)</li>
+                  <li class="down">&minus; 50% damage penalty (15 base)</li>
                   <li class="down">&minus; No knockback, stun or ricochet</li>
-                                  <li class="up">+ Reloads passively, even holstered</li>
+                                  <li class="up">+ This weapon will reload while not active</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Man Melter</h4>
                 <ul class="attrs">
-                  <li class="up">+ Crits burning targets</li>
-                  <li class="up">+ 35% more damage to marked targets</li>
-                  <li class="down">&minus; Strips afterburn off whoever you hit</li>
-                                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="up">+ Critical hits vs burning players</li>
+                  <li class="up">+ Deals 35% increased damage to Marked-For-Death targets</li>
+                  <li class="down">&minus; On Hit: Removes afterburn from the target</li>
+                                  <li class="up">+ This weapon will reload while not active</li>
                 </ul>
               </article>
             </div>
@@ -1021,37 +1273,45 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128163;</span> Demoman</h3>
-              <p class="slide__desc">Fewer explosives out, each one worth more.</p>
             </div>
             <div class="slide__cols">
               <article class="item">
-                <h4>Scottish Resistance</h4>
+                <h4>Quickiebomb Launcher</h4>
                 <ul class="attrs">
                   <li class="up">+ Fires on Shift while stowed</li>
-                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="up">+ This weapon will reload while not active</li>
                   <li class="up">+ No self-damage from its stickies</li>
-                  <li class="up">+ 30% resist to your own explosives</li>
+                  <li class="up">+ 30% blast jump damage reduction</li>
                   <li class="up">+ Marks what it hits for 1 second</li>
-                  <li class="up">+ 25% faster firing</li>
-                  <li class="down">&minus; 2 in the clip, 2 on the ground</li>
+                  <li class="up">+ Detonating clears enemy pipes and stickies caught in it</li>
+                  <li class="up">+ 25% faster firing speed</li>
+                  <li class="down">&minus; 75% clip size (2), max 2 stickies out</li>
                   <li class="down">&minus; 50% damage penalty</li>
+                  <li class="note">Every one of its own stock stats stripped off it</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Eyelander</h4>
+                <ul class="attrs">
+                  <li class="up">+ 25% blast jump damage reduction</li>
+                  <li class="down">&minus; 25 max health on wearer</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Loch-n-Load</h4>
                 <ul class="attrs">
-                  <li class="up">+ 30% more damage to marked targets</li>
+                  <li class="up">+ Deals 30% increased damage to Marked-For-Death targets</li>
                   <li class="up">+ Detonates on walls at half damage</li>
-                  <li class="down">&minus; 2 grenades in the clip</li>
-                                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="down">&minus; 50% clip size (2 grenades)</li>
+                                  <li class="up">+ This weapon will reload while not active</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Skullcutter</h4>
                 <ul class="attrs">
-                  <li class="up">+ Cleaves through multiple enemies</li>
+                  <li class="up">+ Attacks cleave through multiple enemies</li>
                   <li class="up">+ 20% damage bonus</li>
-                  <li class="down">&minus; 10% slower even when holstered</li>
+                  <li class="down">&minus; 10% slower move speed on wearer</li>
                 </ul>
               </article>
             </div>
@@ -1061,19 +1321,32 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#129386;</span> Heavy</h3>
-              <p class="slide__desc">Natascha and the GRU together make the Fat Scout.</p>
             </div>
             <div class="slide__cols">
+              <article class="item">
+                <h4>Fists of Steel</h4>
+                <ul class="attrs">
+                  <li class="up">+ Hold alt-fire to raise a riot shield</li>
+                  <li class="up">+ Everyone inside the circle takes 35% less damage</li>
+                  <li class="up">+ And cannot be critically hit</li>
+                  <li class="down">&minus; 10 seconds of shield, then 10 to recharge</li>
+                  <li class="down">&minus; You slow to minigun speed as it comes up</li>
+                  <li class="down">&minus; Twice as slow to draw and to put away</li>
+                  <li class="note">Ammo won&rsquo;t refill it. It only protects at full spool</li>
+                </ul>
+              </article>
               <article class="item">
                 <h4>Natascha</h4>
                 <ul class="attrs">
                   <li class="up">+ No spin-up &mdash; fires instantly</li>
-                  <li class="up">+ 14 pellets a blast</li>
+                  <li class="up">+ 250% bullets per shot (14)</li>
                   <li class="up">+ No slowdown while spun up</li>
+                  <li class="up">+ Can still jump while firing</li>
                   <li class="down">&minus; 50% damage penalty</li>
-                  <li class="down">&minus; 50 ammo</li>
+                  <li class="down">&minus; 75% max primary ammo on wearer (50)</li>
                   <li class="down">&minus; ~0.9s between blasts</li>
                   <li class="down">&minus; No slow-on-hit, no damage resist</li>
+                  <li class="credit">Curated by Grouch</li>
                 </ul>
               </article>
               <article class="item">
@@ -1105,9 +1378,9 @@
               <article class="item">
                 <h4>Gloves of Running Urgently</h4>
                 <ul class="attrs">
-                  <li class="up">+ 30% faster while they&rsquo;re out</li>
+                  <li class="up">+ 30% faster move speed while active</li>
                   <li class="up">+ No health drain while active</li>
-                  <li class="down">&minus; 50 max health while equipped</li>
+                  <li class="down">&minus; 50 max health on wearer</li>
                 </ul>
               </article>
             </div>
@@ -1117,13 +1390,13 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128295;</span> Engineer</h3>
-              <p class="slide__desc">A nest, or a companion. Not both.</p>
             </div>
             <div class="slide__cols">
               <article class="item">
                 <h4>Caller</h4>
                 <ul class="attrs">
                   <li class="note">Deploys a drone that follows you, your entire suite of buildings in one gadget.</li>
+                  <li class="credit">A LOT OF CURATION</li>
                 </ul>
               </article>
                             <article class="item">
@@ -1140,16 +1413,19 @@
                 <ul class="attrs">
                   <li class="up">+ Teleporters work both ways</li>
                   <li class="up">+ Walk into the exit to come back to the entrance</li>
+                  <li class="credit">Idea by Grouch</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Southern Hospitality</h4>
                 <ul class="attrs">
                   <li class="up">+ Dispensers heal 50% faster</li>
-                  <li class="up">+ Triple dispenser range</li>
+                  <li class="up">+ 4.5&times; dispenser range</li>
+                  <li class="up">+ Sentries cost 100 metal</li>
                   <li class="down">&minus; Sentries stop at level 2</li>
                   <li class="down">&minus; Dispensers cost 130 metal</li>
                   <li class="note">Dispenser figures compare against a normal dispenser of the same level</li>
+                  <li class="credit">Idea by HiGPS</li>
                 </ul>
               </article>
               <article class="item">
@@ -1157,6 +1433,7 @@
                 <ul class="attrs">
                   <li class="up">+ Recharges passively</li>
                   <li class="note">Runs on a meter like the Cow Mangler</li>
+                  <li class="credit">Idea by Uncle Dane</li>
                 </ul>
               </article>
               <article class="item">
@@ -1166,6 +1443,7 @@
                   <li class="up">+ Damages buildings normally again</li>
                   <li class="down">&minus; Overheats, then locks out to cool</li>
                   <li class="down">&minus; No longer drains &uuml;ber or cloak</li>
+                  <li class="credit">Curated by r/WI &amp; Gumbozo</li>
                 </ul>
               </article>
             </div>
@@ -1175,7 +1453,6 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#10133;</span> Medic</h3>
-              <p class="slide__desc">A resource to spend, not an &uuml;ber to bank.</p>
             </div>
             <div class="slide__cols">
               <article class="item item--pin">
@@ -1187,23 +1464,26 @@
               <article class="item">
                 <h4>Vaccinator</h4>
                 <ul class="attrs">
-                  <li class="up">+ M2 beam heals an ally or drains an enemy</li>
+                  <li class="up">+ Two beams &mdash; either one heals allies or drains enemies</li>
+                  <li class="up">+ M1 costs nothing, use it like any medigun</li>
+                  <li class="up">+ Both beams can hit the same target at once</li>
                   <li class="up">+ Draining overheals you for half the damage</li>
-                  <li class="up">+ Starts full, refills while holstered</li>
-                  <li class="up">+ 900-unit beam range</li>
-                  <li class="down">&minus; Drains empty in about 8 seconds</li>
+                  <li class="up">+ 20% heal range</li>
+                  <li class="up">+ Meter starts full and refills on its own, even holstered</li>
+                  <li class="down">&minus; Only M2 spends the meter &mdash; about 8 seconds of it</li>
+                  <li class="note">No &uuml;ber and no resistances &mdash; the meter is a battery, not a charge</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Boltsauger</h4>
                 <ul class="attrs">
                   <li class="up">+ Fires bolts that can headshot</li>
-                  <li class="up">+ Crits marked targets</li>
-                  <li class="up">+ 50% faster projectiles</li>
+                  <li class="up">+ Critical hits vs Marked-For-Death targets</li>
+                  <li class="up">+ 50% projectile speed</li>
                   <li class="down">&minus; 33% damage penalty</li>
                   <li class="down">&minus; A single bolt loaded</li>
                   <li class="note">The Blutsauger, rebuilt as a crossbow</li>
-                                  <li class="up">+ Reloads passively, even holstered</li>
+                                  <li class="up">+ This weapon will reload while not active</li>
                 </ul>
               </article>
               <article class="item">
@@ -1211,20 +1491,60 @@
                 <ul class="attrs">
                   <li class="up">+ Fires energy pulses from the primary slot</li>
                   <li class="up">+ Knockback on hit</li>
-                                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="up">+ Firing in mid-air shoves you backwards</li>
+                                  <li class="up">+ This weapon will reload while not active</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Transfuser</h4>
                 <ul class="attrs">
-                  <li class="up">+ On hit: 65 overheal</li>
+                  <li class="up">+ On Hit: Overheal the target by 65</li>
                   <li class="note">A plain bonesaw otherwise</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Vita-Saw</h4>
+                <ul class="attrs">
+                  <li class="up">+ Your &uuml;ber drops on death &mdash; walk back and take it</li>
+                  <li class="up">+ Keeps 70% of what you had</li>
+                  <li class="down">&minus; Only you can pick it up, and it keeps for a minute</li>
+                  <li class="note">No more banking &uuml;ber through respawn</li>
+                  <li class="credit">Idea by HiGPS</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Syringe Gun</h4>
+                <ul class="attrs">
+                  <li class="up">+ On Hit: Gain 3 health</li>
+                  <li class="up">+ That healing overheals you</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Kritzkrieg</h4>
+                <ul class="attrs">
+                  <li class="up">+ 10% &Uuml;berCharge rate</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Solemn Vow</h4>
+                <ul class="attrs">
+                  <li class="up">+ Marked enemies within 10m light up, coloured by their health</li>
+                  <li class="credit">Idea by FTELEY</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Quick-Fix</h4>
                 <ul class="attrs">
-                  <li class="up">+ Keeps its speed with no patient</li>
+                  <li class="up">+ Hold Shift in mid-air to hover</li>
+                  <li class="up">+ Keeps up with a faster patient</li>
+                  <li class="note">No charge, no cooldown &mdash; a slower B.A.S.E. Jumper</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Amputator</h4>
+                <ul class="attrs">
+                  <li class="up">+ Walk and look around freely while the heal taunt plays</li>
+                  <li class="note">Keeps the taunt&rsquo;s area heal and its passive regen</li>
                 </ul>
               </article>
             </div>
@@ -1234,39 +1554,62 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#127919;</span> Sniper</h3>
-              <p class="slide__desc">Aim over patience.</p>
             </div>
             <div class="slide__cols">
+              <article class="item">
+                <h4>Class-wide</h4>
+                <ul class="attrs">
+                  <li class="down">&minus; Scoping shows a beam along your line of sight</li>
+                  <li class="note">Team-coloured. The Bazaar Bargain, Heatmaker and bows are exempt</li>
+                  <li class="credit">Idea by Shounic</li>
+                </ul>
+              </article>
               <article class="item">
                 <h4>Bazaar Bargain</h4>
                 <ul class="attrs">
                   <li class="up">+ Headshots from the hip</li>
                   <li class="up">+ Flat 50 body, 150 head, any range</li>
                   <li class="down">&minus; Cannot scope, so it never charges</li>
+                  <li class="credit">Idea by Moonman</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Jarate</h4>
+                <ul class="attrs">
+                  <li class="up">+ Marks everyone it splashes</li>
+                  <li class="up">+ Pins them down &mdash; they can barely leave the ground</li>
+                  <li class="note">The Sydney Sleeper does it too. Mad Milk doesn&rsquo;t</li>
+                  <li class="credit">Idea by JDUBST3P, FTELEY &amp; Zesty</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Hitman&rsquo;s Heatmaker</h4>
+                <ul class="attrs">
+                  <li class="down">&minus; Charges to half, so headshots cap at 300</li>
+                  <li class="note">Still no beam while you scope</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Darwin&rsquo;s Danger Shield</h4>
                 <ul class="attrs">
-                  <li class="up">+ 25 max health</li>
-                  <li class="down">&minus; 30% more damage taken while marked</li>
-                  <li class="down">&minus; 50% more crit damage taken</li>
-                  <li class="down">&minus; No fire immunity or resistance</li>
+                  <li class="up">+ 25 max health on wearer</li>
+                  <li class="down">&minus; 30% damage vulnerability while Marked-For-Death</li>
+                  <li class="down">&minus; 50% critical damage vulnerability on wearer</li>
+                  <li class="down">&minus; No fire immunity or afterburn resistance</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Shahanshah</h4>
                 <ul class="attrs">
-                  <li class="up">+ Knocks the target back on hit</li>
+                  <li class="up">+ On Hit: Knockback on the target</li>
                   <li class="up">+ Swing mid-air to launch yourself</li>
-                  <li class="up">+ 25% damage below half health</li>
-                  <li class="down">&minus; 25% damage above half health</li>
+                  <li class="note">The health-based damage swing is gone &mdash; knockback is all it does now</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Huntsman</h4>
                 <ul class="attrs">
-                  <li class="up">+ 25 max health</li>
+                  <li class="up">+ 25 max health on wearer</li>
                 </ul>
               </article>
               <article class="item">
@@ -1274,6 +1617,14 @@
                 <ul class="attrs">
                   <li class="up">+ Keeps its no-flinch and knockback resist</li>
                   <li class="down">&minus; Passive health regen removed</li>
+                  <li class="credit">Idea by FTELEY</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Fortified Compound</h4>
+                <ul class="attrs">
+                  <li class="up">+ 25 max health on wearer</li>
+                  <li class="note">The tanky bow &mdash; everything the Huntsman does, plus the health</li>
                 </ul>
               </article>
             </div>
@@ -1283,21 +1634,23 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#128481;</span> Spy</h3>
-              <p class="slide__desc">The mark is his key to the map.</p>
             </div>
             <div class="slide__cols">
               <article class="item item--pin">
                 <h4>Class-wide</h4>
                 <ul class="attrs">
                   <li class="up">+ Any knife backstabs a marked target from any angle</li>
+                  <li class="up">+ Disguised, you move at Scout speed</li>
+                  <li class="up">+ Sapped buildings glow for your team through walls</li>
                   <li class="down">&minus; Razorback and shields still block it</li>
+                  <li class="note">Hold Shift to walk at normal Spy speed</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Ice-Tip</h4>
                 <ul class="attrs">
-                  <li class="up">+ 50 max health</li>
-                  <li class="up">+ 65 damage a swing</li>
+                  <li class="up">+ 50 max health on wearer</li>
+                  <li class="up">+ 65 damage per hit</li>
                   <li class="down">&minus; Backstabs crit for ~195, no instant kill</li>
                 </ul>
               </article>
@@ -1309,11 +1662,77 @@
                 </ul>
               </article>
               <article class="item">
+                <h4>Red-Tape Recorder</h4>
+                <ul class="attrs">
+                  <li class="up">+ Special-attack or R throws it &mdash; it slides along the floor</li>
+                  <li class="up">+ Where it lands it keeps every building near it sapped</li>
+                  <li class="up">+ Left-click still saps by hand as normal</li>
+                  <li class="down">&minus; It has 300 health and melee crits it</li>
+                  <li class="down">&minus; 20 seconds between throws</li>
+                  <li class="note">Break it or the wrench never wins. No longer reverses build levels</li>
+                  <li class="credit">Throw after Chdata &middot; EMP sapper by WW, curated by Smk</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Dead Drop</h4>
+                <ul class="attrs">
+                  <li class="up">+ Hold alt-fire to wind up, release to throw the watch</li>
+                  <li class="up">+ Press again to teleport to it and vanish for 5 seconds</li>
+                  <li class="up">+ Recharges in 30 seconds, and from ammo</li>
+                  <li class="down">&minus; No cloak on demand at all</li>
+                  <li class="note">Trigger it the instant it lands or bank it for half a minute</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Conniver&rsquo;s Kunai</h4>
+                <ul class="attrs">
+                  <li class="up">+ Backstabs stack you up to 430 health</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Cleaner&rsquo;s Carbine</h4>
+                <ul class="attrs">
+                  <li class="up">+ Headshots</li>
+                  <li class="up">+ Always crits Marked-For-Death targets</li>
+                  <li class="down">&minus; Crits deal 200% instead of 300%</li>
+                  <li class="down">&minus; 25% slower firing speed</li>
+                  <li class="note">Replaces the Enforcer. The Sniper keeps it too &mdash; it&rsquo;s multi-class now</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>L&rsquo;Etranger</h4>
+                <ul class="attrs">
+                  <li class="up">+ Marks whoever you hit</li>
+                  <li class="up">+ 40% cloak duration</li>
+                  <li class="up">+ The enemy team never hears it fire</li>
+                  <li class="down">&minus; Heals its target 1 health instead of hurting them</li>
+                  <li class="note">A designator, not a gun</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Diamondback</h4>
+                <ul class="attrs">
+                  <li class="up">+ Banks a crit per backstab and per sapped building</li>
+                  <li class="down">&minus; Stored crits deal normal damage</li>
+                  <li class="down">&minus; Crits fall off with range</li>
+                  <li class="down">&minus; Holds 2 crits instead of 35</li>
+                  <li class="down">&minus; 50% clip size</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Cloak &amp; Dagger</h4>
+                <ul class="attrs">
+                  <li class="up">+ Walk straight through enemies</li>
+                  <li class="up">+ Fire, bleed and milk can&rsquo;t touch you while invisible</li>
+                  <li class="down">&minus; Cloaking takes half a second longer</li>
+                </ul>
+              </article>
+              <article class="item">
                 <h4>Dead Ringer</h4>
                 <ul class="attrs">
-                  <li class="up">+ Ammo and dispensers refill cloak again</li>
-                  <li class="down">&minus; Triggering hit reduced 50%, not 75%</li>
-                  <li class="note">Rolled back to July 2015</li>
+                  <li class="up">+ 60% damage reduction while feigning</li>
+                  <li class="down">&minus; Ammo no longer refills your cloak</li>
+                  <li class="note">Rolled back to July 2015, then retuned</li>
                 </ul>
               </article>
             </div>
@@ -1323,9 +1742,34 @@
           <section class="slide">
             <div class="slide__head">
               <h3 class="slide__title"><span class="slide__ico" aria-hidden="true">&#127758;</span> All-Class</h3>
-              <p class="slide__desc">The systems underneath everything.</p>
             </div>
             <div class="slide__cols">
+              <article class="item">
+                <h4>Game-wide</h4>
+                <ul class="attrs">
+                  <li class="down">&minus; No random critical hits</li>
+                  <li class="down">&minus; No random bullet spread &mdash; fixed patterns</li>
+                  <li class="down">&minus; No random damage spread</li>
+                  <li class="up">+ Aim is sent at far higher precision &mdash; heads track where they really are</li>
+                  <li class="credit">Idea by Shounic</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Pain Train</h4>
+                <ul class="attrs">
+                  <li class="up">+ Counts double on a point</li>
+                  <li class="note">Bullet vulnerability removed &mdash; no drawback at all now</li>
+                </ul>
+              </article>
+              <article class="item">
+                <h4>Half-Zatoichi</h4>
+                <ul class="attrs">
+                  <li class="up">+ 40% faster on Soldier, 37.5% on Demoman</li>
+                  <li class="up">+ A kill or an assist refills every clip you own</li>
+                  <li class="down">&minus; You cannot put it away until it scores</li>
+                  <li class="down">&minus; You are marked the whole time it&rsquo;s out</li>
+                </ul>
+              </article>
               <article class="item">
                 <h4>Marked For Death</h4>
                 <ul class="attrs">
@@ -1339,18 +1783,17 @@
                 <ul class="attrs">
                   <li class="up">+ Stacks 10 times, 1 damage/sec each</li>
                   <li class="up">+ Every flame hit adds a stack</li>
-                  <li class="down">&minus; Applies to every fire source</li>
                 </ul>
               </article>
               <article class="item">
                 <h4>Panic Attack</h4>
                 <ul class="attrs">
                   <li class="up">+ Dumps its whole clip in one burst</li>
-                  <li class="up">+ 200% faster firing</li>
-                  <li class="up">+ Reloads passively, even holstered</li>
+                  <li class="up">+ 200% faster firing speed</li>
+                  <li class="up">+ This weapon will reload while not active</li>
                   <li class="down">&minus; 50% clip size</li>
                   <li class="down">&minus; 100% more spread, and it climbs every shot</li>
-                  <li class="down">&minus; 100% reload speed</li>
+                  <li class="down">&minus; 100% slower reload speed</li>
                   <li class="note">Every other stock stat stripped off it</li>
                 </ul>
               </article>
@@ -1358,8 +1801,9 @@
                 <h4>Reserve Shooter</h4>
                 <ul class="attrs">
                   <li class="up">+ 15% damage bonus</li>
-                  <li class="up">+ 20% faster to deploy</li>
-                  <li class="down">&minus; 2 shells off the clip</li>
+                  <li class="up">+ 20% faster weapon switch</li>
+                  <li class="down">&minus; 34% clip size</li>
+                  <li class="credit">Curated by r/WI</li>
                 </ul>
               </article>
             </div>
@@ -1815,5 +2259,232 @@
   track.addEventListener("keydown", arrowKeys);
 }());
 </script>
-</body>
-</html>
+
+<script>
+/* ---------------- stock comparison ----------------
+   Click any weapon panel: the stock TF2 weapon and this build's version open side by side.
+
+   No affordance is drawn on the panels on purpose - they read as clickable objects already,
+   and a badge on every card was visual noise.
+
+   The STOCK table below is the weapon's REAL stock attribute list, written the way TF2 writes
+   it. It is not a description of what changed - the point is that the reader compares the two
+   columns themselves. The right-hand column is cloned live from the panel, so it can never
+   drift out of sync with the changelog.
+
+   The carousel's capture-phase click handler already swallows clicks that follow a drag
+   (>3px), so dragging across a panel cannot open this. The listener here is bubble-phase and
+   sits behind that guard - don't "fix" it. */
+(function () {
+  var STOCK = {
+    "Candy Cane": ["+ On Kill: Drop a small health pack", "- 25% fire damage vulnerability on wearer"],
+    "Flying Guillotine": ["+ Does not require ammo", "+ Throwable: 50 damage and bleed on hit", "+ Long distance hits mini-crit", "- No random critical hits"],
+    "Force-a-Nature": ["+ 20% bullets per shot", "+ 50% faster firing speed", "+ Knockback on the target and shooter", "- 10% damage penalty", "- 66% clip size", "= Reloads its entire clip at once"],
+    "Shortstop": ["+ Alt-Fire: Shove your target", "+ Reloads its entire clip at once", "- 25% increase in push force taken on wearer"],
+    "Sandman": ["+ Alt-Fire: Launch a ball that stuns the target", "- 15 max health on wearer"],
+    "Pocket Pistol": ["+ 50% faster firing speed", "+ On Hit: Gain 3 health", "+ Wearer never takes falling damage", "- 25 max health on wearer"],
+    "Direct Hit": ["+ 25% damage bonus", "+ 80% projectile speed", "+ Mini-crits airborne targets", "- 70% explosion radius"],
+    "Black Box": ["+ On Hit: Gain up to +20 health", "- 25% clip size"],
+    "Market Gardener": ["+ Critical hits while rocket jumping", "- 20% slower firing speed", "- No random critical hits"],
+    "Liberty Launcher": ["+ 40% projectile speed", "+ 25% clip size", "+ 25% less damage to self from rocket jumps", "- 25% damage penalty"],
+    "Equalizer": ["+ Damage increases as your health drops", "- Blocks healing while active"],
+    "Cow Mangler 5000": ["+ Does not require ammo", "+ Alt-Fire: charged shot that mini-crits and disables buildings", "- 20% damage vs buildings", "- No random critical hits"],
+    "Beggar\u2019s Bazooka": ["+ Hold Fire to load up to 3 rockets", "- Overloading detonates in your face", "- 3 degrees of projectile spread", "- 20% explosion radius", "- Cannot be holstered while loaded"],
+    "Axtinguisher": ["+ Mini-crits burning targets and extinguishes them", "- 33% damage penalty", "- 35% slower holster speed", "- No random critical hits"],
+    "Volcano Fragment": ["+ On Hit: Target is engulfed in flames", "- 25% damage penalty"],
+    "Scorch Shot": ["+ Knocks the target back on hit", "+ Flare ricochets and knocks back again", "+ Mini-crits burning players", "- 35% damage penalty"],
+    "Man Melter": ["+ Does not require ammo", "+ Alt-Fire: extinguish teammates to store a crit", "+ Projectiles cannot be deflected", "- No random critical hits"],
+    "Quickiebomb Launcher": ["+ 50% faster charge", "+ Stickybombs arm sooner", "- 35% damage penalty", "- 50% clip size", "- 6 max stickies out"],
+    "Eyelander": ["+ Heads grant speed and max health", "+ This weapon has a large melee range", "- 25 max health on wearer", "- No random critical hits"],
+    "Loch-n-Load": ["+ 20% projectile speed", "+ 20% damage vs buildings", "- Grenades shatter on surfaces without exploding", "- 25% clip size", "- 25% max primary ammo"],
+    "Skullcutter": ["+ 20% damage bonus", "+ This weapon has a large melee range", "- 15% slower move speed while active"],
+    "Fists of Steel": ["+ 40% less damage from ranged sources while active", "- 100% more damage from melee while active", "- 80% slower holster speed", "- Reduces healing from Medics"],
+    "Natascha": ["+ On Hit: Slow the target", "+ 20% damage resistance while spun up", "- 25% damage penalty", "- 30% slower spin-up"],
+    "Buffalo Steak Sandvich": ["+ Eat for mini-crits and +35% move speed for 16s", "- Melee only while active", "- 20% damage vulnerability while active"],
+    "Banana": ["+ Eat to regain up to 75 health", "+ Alt-Fire: throw a small health pack", "= Recharges over 30s"],
+    "Dalokohs Bar": ["+ Eat to regain 75 health", "+ 50 max health for 30s after eating"],
+    "Gloves of Running Urgently": ["+ 30% faster move speed while active", "- Health drains while active", "- 50% damage penalty"],
+    "Wrangler": ["+ Alt-Fire: control your sentry manually", "+ Sentry keeps a damage-halving shield while wrangled", "- Sentry is disabled for 3s after switching away"],
+    "Eureka Effect": ["+ Reload to teleport to spawn or your teleporter exit", "- 50% metal from pickups", "- Cannot pick up buildings"],
+    "Southern Hospitality": ["+ On Hit: Bleed for 5s", "- No random critical hits", "- 20% fire damage vulnerability on wearer"],
+    "Short Circuit": ["+ Uses metal to destroy projectiles", "+ Alt-Fire: orb that destroys projectiles for 65 metal", "- Cannot fire without metal"],
+    "Pomson 6000": ["+ Does not require ammo", "+ On Hit: drains Medic UberCharge and Spy cloak", "- 25% damage vs buildings"],
+    "Vaccinator": ["+ 67% faster UberCharge rate", "+ Uber grants 75% resistance to one damage type", "+ Charge is spent in quarters", "- 33% overheal"],
+    "Boltsauger": ["+ On Hit: Gain 3 health", "- 2 health drained per second on wearer"],
+    "Overdose": ["+ Move speed scales with your UberCharge", "- 15% damage penalty"],
+    "Transfuser": ["= The stock bonesaw - no attributes of its own"],
+    "Vita-Saw": ["+ On Death: keep up to 20% of your UberCharge", "- 10 max health on wearer"],
+    "Syringe Gun": ["= The stock syringe gun - no attributes of its own"],
+    "Kritzkrieg": ["+ Uber grants 100% critical hits", "+ 25% faster UberCharge rate", "+ 3 health per second passive regen"],
+    "Solemn Vow": ["+ Lets you see enemy health", "- 10% slower firing speed"],
+    "Quick-Fix": ["+ 40% faster heal rate", "+ 10% faster move speed", "+ Uber grants 3x heal rate and movement immunity", "- Cannot overheal past 125%"],
+    "Amputator": ["+ Taunt: heal nearby teammates", "+ 3 health per second passive regen", "- 20% damage penalty", "- The taunt roots you in place"],
+    "Bazaar Bargain": ["+ Charge rate increases with each headshot", "- Missing a headshot loses your heads", "- Starts with a much slower charge rate"],
+    "Jarate": ["+ Coated enemies take mini-crits", "+ Extinguishes burning teammates", "= Recharges over 20s"],
+    "Hitman\u2019s Heatmaker": ["+ Kills and assists build Focus", "+ Focus: 25% faster charge, no unscoping on fire", "- 20% damage on bodyshots"],
+    "Darwin\u2019s Danger Shield": ["+ 25 max health on wearer", "+ 20% fire damage resistance on wearer", "+ Immune to afterburn"],
+    "Shahanshah": ["+ 25% damage bonus when below 50% health", "- 25% damage penalty when above 50% health"],
+    "Huntsman": ["+ Arrows can headshot", "+ Arrows can be lit by fire", "- Must be charged for full damage"],
+    "Cozy Camper": ["+ 1 health regenerated per second", "+ No flinching while aiming", "+ 20% knockback resistance while aiming"],
+    "Fortified Compound": ["+ Arrows can headshot and be lit by fire", "+ 20% faster charge", "- 20% slower reload"],
+    "Ice-Tip": ["+ Backstabs kill instantly", "= Otherwise the stock knife"],
+    "Ambassador": ["+ Headshots deal critical damage", "- 15% damage penalty", "- No headshot crits beyond 1200 units", "- No random critical hits"],
+    "Red-Tape Recorder": ["+ Reverses building construction instead of damaging it", "- Slower to take a building down than a stock sapper"],
+    "Conniver\u2019s Kunai": ["+ On Backstab: absorb the victim\u2019s health, up to 210", "- 55 max health on wearer"],
+    "Cleaner\u2019s Carbine": ["+ On Kill: gain Crikey for mini-crits", "- 20% clip size", "- 25% damage penalty"],
+    "L\u2019Etranger": ["+ 40% cloak duration", "+ On Hit: +15% cloak", "- 20% damage penalty"],
+    "Diamondback": ["+ Backstabs and sapped buildings store a critical hit", "- 15% damage penalty", "- No random critical hits"],
+    "Cloak & Dagger": ["+ Cloak drains only while moving", "+ Recharges while standing still", "- Cannot recharge from ammo"],
+    "Dead Ringer": ["+ Feign your death when damaged", "+ Damage resistance while feigning", "- Cloak drains faster"],
+    "Pain Train": ["+ 1 extra point capture rate", "- 10% bullet damage vulnerability on wearer"],
+    "Half-Zatoichi": ["+ On Kill: restore 50% of your health", "+ Kills another Zatoichi user in one hit", "- Cannot be holstered until it kills"],
+    "Panic Attack": ["+ Hold Fire to load up to 4 shells", "+ 50% bullets per shot", "+ Fires faster as your health drops", "- 30% damage penalty"],
+    "Reserve Shooter": ["+ Mini-crits airborne targets for 3s after switching to it", "+ 20% faster weapon switch", "- 34% clip size"]
+  };
+
+  /* The weapon's FULL current card. Empty for now on purpose - see the note above; anything
+     absent here falls back to cloning the changelog panel, so the overlay still works. These
+     want GENERATING from items_game.txt rather than hand-writing, because the changelog prose
+     is a diff and does not always know what survived. */
+  var CURRENT = {};
+
+  function row(raw) {
+    var mark = raw.charAt(0);
+    var li = document.createElement("li");
+    li.className = mark === "+" ? "up" : (mark === "-" ? "down" : "note");
+    var glyph = mark === "+" ? "+ " : (mark === "-" ? "\u2212 " : "");
+    li.appendChild(document.createTextNode(glyph + raw.slice(1).replace(/^\s+/, "")));
+    return li;
+  }
+
+  var modal = document.createElement("div");
+  modal.className = "compare";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.innerHTML =
+    '<div class="compare__stage" tabindex="-1">' +
+      '<h3 class="compare__name"></h3>' +
+      '<div class="compare__cols">' +
+        '<div class="compare__col">' +
+          '<p class="compare__label">Current</p>' +
+          '<div class="compare__side compare__side--old"><ul></ul></div>' +
+        '</div>' +
+        '<div class="compare__col">' +
+          '<p class="compare__label">M4D</p>' +
+          '<div class="compare__side compare__side--new"><ul></ul></div>' +
+        '</div>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(modal);
+
+  var stage = modal.querySelector(".compare__stage");
+  var nameEl = modal.querySelector(".compare__name");
+  var oldList = modal.querySelector(".compare__side--old ul");
+  var newList = modal.querySelector(".compare__side--new ul");
+  var lastFocus = null;
+
+  function close() {
+    modal.className = "compare";
+    if (lastFocus) { lastFocus.focus(); }
+  }
+
+  /* Anything outside the two panels dismisses - the backdrop, the gap between them, and the
+     weapon name itself. Walking up from the target rather than testing e.target === modal,
+     because the name and the grid are both children of the overlay and would otherwise be
+     dead zones you could click without anything happening. */
+  modal.addEventListener("click", function (e) {
+    var el = e.target;
+    while (el && el !== modal) {
+      if (el.className && String(el.className).indexOf("compare__side") !== -1) { return; }
+      el = el.parentNode;
+    }
+    close();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape" && modal.className.indexOf("is-open") !== -1) { close(); }
+  });
+
+  function open(item, title, rows) {
+    lastFocus = item;
+    nameEl.textContent = title;
+
+    oldList.innerHTML = "";
+    for (var i = 0; i < rows.length; i++) {
+      oldList.appendChild(row(rows[i]));
+    }
+
+    /* The weapon's FULL current card, not a diff - kept stock stats included, so the two
+       columns are like for like. Falls back to cloning the changelog panel for anything not
+       yet written into CURRENT, so a missing entry degrades instead of showing an empty box. */
+    newList.innerHTML = "";
+    var now = CURRENT[title];
+    if (now) {
+      for (var n = 0; n < now.length; n++) {
+        newList.appendChild(row(now[n]));
+      }
+    } else {
+      var src = item.querySelectorAll(".attrs li");
+      for (var j = 0; j < src.length; j++) {
+        if (src[j].className === "credit") { continue; }
+        newList.appendChild(src[j].cloneNode(true));
+      }
+    }
+
+    modal.className = "compare is-open";
+    stage.focus();
+  }
+
+  var items = document.querySelectorAll(".track .item");
+  for (var k = 0; k < items.length; k++) {
+    (function (item) {
+      var h = item.querySelector("h4");
+      if (!h) { return; }
+      var title = h.textContent.trim();
+      var rows = STOCK[title];
+      if (!rows) { return; }   /* new weapon - nothing to compare, panel stays inert */
+
+      item.className += " cmpable";
+      item.setAttribute("role", "button");
+      item.setAttribute("tabindex", "0");
+      item.setAttribute("data-cmp", title);
+      item.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+          e.preventDefault();
+          open(item, title, rows);
+        }
+      });
+    }(items[k]));
+  }
+
+  /* WHY THIS IS NOT A CLICK LISTENER ON THE PANEL.
+     The carousel calls track.setPointerCapture() on pointerdown so a drag keeps tracking once
+     the cursor leaves the element. While a pointer is captured the browser retargets that whole
+     sequence - INCLUDING the resulting click - to the capturing element, so a click listener on
+     the panel itself never fires. That is why clicking did nothing at all in the first version.
+     So: watch the pointer on the track and resolve which panel was underneath it on release.
+     Movement is measured here rather than reused from the carousel, because its own guard lives
+     in a separate closure and cannot be read from this one. */
+  var track = document.getElementById("track");
+  if (track) {
+    var downX = 0, downY = 0, dragged = false;
+
+    track.addEventListener("pointerdown", function (e) {
+      downX = e.clientX;
+      downY = e.clientY;
+      dragged = false;
+    });
+    track.addEventListener("pointermove", function (e) {
+      if (Math.abs(e.clientX - downX) > 3 || Math.abs(e.clientY - downY) > 3) { dragged = true; }
+    });
+    track.addEventListener("pointerup", function (e) {
+      if (dragged) { return; }          /* that was a drag of the carousel, not a click */
+      var el = document.elementFromPoint(e.clientX, e.clientY);
+      while (el && el !== track) {
+        var t = el.getAttribute ? el.getAttribute("data-cmp") : null;
+        if (t && STOCK[t]) { open(el, t, STOCK[t]); return; }
+        el = el.parentNode;
+      }
+    });
+  }
+}());
+</script>
